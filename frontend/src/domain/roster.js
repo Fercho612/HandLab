@@ -1,5 +1,3 @@
-import { GOALKEEPER_START } from './court.js'
-
 export const Side = Object.freeze({ ATTACK: 'attack', DEFENSE: 'defense' })
 export const Role = Object.freeze({ FIELD: 'field', GOALKEEPER: 'goalkeeper' })
 
@@ -37,22 +35,14 @@ export function validateRoster(players) {
 }
 
 /**
- * Turns the optional goalkeeper on or off. An enabled goalkeeper appears directly in the goal.
+ * Turns the optional goalkeeper on or off.
  * Returns a new players array; enabling twice keeps the existing goalkeeper.
  */
 export function setGoalkeeperEnabled(players, enabled, goalkeeperId) {
   const hasGoalkeeper = players.some(isGoalkeeper)
   if (!enabled) return players.filter((player) => !isGoalkeeper(player))
   if (hasGoalkeeper) return players
-  return [
-    ...players,
-    {
-      id: goalkeeperId,
-      side: Side.DEFENSE,
-      role: Role.GOALKEEPER,
-      trajectory: [{ t: 0, ...GOALKEEPER_START }],
-    },
-  ]
+  return [...players, { id: goalkeeperId, side: Side.DEFENSE, role: Role.GOALKEEPER }]
 }
 
 function isGoalkeeper(player) {

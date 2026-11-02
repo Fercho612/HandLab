@@ -94,3 +94,8 @@
   margin: 0;
   color: #b42318;
 }
+
+.step[aria-pressed='true'] {
+  font-weight: 700;
+  outline: 2px solid var(--color-court);
+}

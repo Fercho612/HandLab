@@ -5,7 +5,7 @@ export default function WhiteboardPage() {
   return (
     <main className={styles.page}>
       <h1>Pizarra</h1>
-      <p>Arrastra un jugador o la pelota para grabar su movimiento.</p>
+      <p>Agrega pasos y mueve a los jugadores o la pelota en cada uno.</p>
       <Whiteboard />
     </main>
   )

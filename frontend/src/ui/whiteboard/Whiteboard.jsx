@@ -1,14 +1,25 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { createPlaybackClock } from '../../application/playbackClock.js'
-import { createTrajectoryRecorder } from '../../application/trajectoryRecorder.js'
-import { ballHolderAt, ballPositionAt, recordBallAction, resolveBallRelease } from '../../domain/ball.js'
+import { BallActionType, heldBallPosition, resolveBallRelease } from '../../domain/ball.js'
 import { COURT, clampToCourt } from '../../domain/court.js'
-import { createDefaultPlay, playDuration, recordPlayerLayer, resetPlay, setPlayGoalkeeper } from '../../domain/play.js'
+import {
+  addStep,
+  ballPositionAt,
+  createDefaultPlay,
+  moveBall,
+  movePlayer,
+  nearestStep,
+  playDuration,
+  playerPositionAt,
+  resetPlay,
+  setPlayGoalkeeper,
+  stepTime,
+} from '../../domain/play.js'
 import { Role, Side } from '../../domain/roster.js'
-import { positionAt } from '../../domain/trajectory.js'
 import CourtLines from './CourtLines.jsx'
 import PlayActions from './PlayActions.jsx'
 import PlaybackControls from './PlaybackControls.jsx'
+import StepBar from './StepBar.jsx'
 import { BallToken, PlayerToken } from './Tokens.jsx'
 import { toCourtPoint } from './toCourtPoint.js'
 import { usePlaybackLoop } from './usePlaybackLoop.js'
@@ -17,18 +28,15 @@ import styles from './Whiteboard.module.css'
 /** Space drawn behind the goal line, in meters: about 20px when the board is at its 640px maximum width. */
 const GOAL_SIDE_MARGIN = 0.625
 const VIEW_BOX = `0 ${-GOAL_SIDE_MARGIN} ${COURT.WIDTH} ${COURT.LENGTH + GOAL_SIDE_MARGIN}`
-/**
- * A held ball is drawn in front of its holder, overlapping the marker a little.
- * Attackers face the goal (towards y = 0); defenders and the goalkeeper face the half-court line.
- */
-const HELD_BALL_OFFSET = { [Side.ATTACK]: { x: 0, y: -0.5 }, [Side.DEFENSE]: { x: 0, y: 0.5 } }
+/** A drag shorter than this, in meters, is a tap and changes nothing. */
+const MIN_DRAG_DISTANCE = 0.05
 const INVALID_RELEASE_MESSAGE = 'La pelota tiene que terminar en un jugador o en el arco.'
 const RESTART_CONFIRMATION = '¿Reiniciar la pizarra? Se borrará todo lo grabado.'
 
 /** Wall-clock time for the playback clock; only called from event handlers and the animation loop. */
 const wallClock = () => performance.now()
 
-const Recording = Object.freeze({ PLAYER: 'player', BALL: 'ball' })
+const Dragging = Object.freeze({ PLAYER: 'player', BALL: 'ball' })
 
 const round = (value) => Math.round(value * 1000) / 1000
 const moveTo = (element, { x, y }) => element.setAttribute('transform', `translate(${round(x)} ${round(y)})`)
@@ -47,12 +55,13 @@ function playerLabels(players) {
 
 export default function Whiteboard() {
   const [play, setPlay] = useState(createDefaultPlay)
+  const [selectedStep, setSelectedStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [message, setMessage] = useState(null)
 
   const [clock] = useState(() => createPlaybackClock({ duration: 0 }))
   const playRef = useRef(play)
-  const recordingRef = useRef(null)
+  const dragRef = useRef(null)
   const svgRef = useRef(null)
   const playerRefs = useRef(new Map())
   const ballRef = useRef(null)
@@ -65,21 +74,21 @@ export default function Whiteboard() {
 
   usePlaybackLoop(() => {
     const now = wallClock()
-    const recording = recordingRef.current
-    if (!recording && clock.isPlaying() && clock.hasEnded(now)) {
+    if (clock.isPlaying() && clock.hasEnded(now)) {
       clock.pause(now)
       setIsPlaying(false)
+      setSelectedStep(nearestStep(playRef.current, clock.timeAt(now)))
     }
 
     const t = clock.timeAt(now)
-    const { players, ball } = playRef.current
-    const isDragged = (kind, id) => recording?.kind === kind && recording.id === id
-    const playerPosition = (player) =>
-      isDragged(Recording.PLAYER, player.id) ? recording.point : positionAt(player.trajectory, t)
+    const current = playRef.current
+    const drag = dragRef.current
+    const draggedPlayer = drag?.kind === Dragging.PLAYER ? drag.id : null
+    const positionOf = (id) => (id === draggedPlayer ? drag.point : playerPositionAt(current, id, t))
 
-    for (const player of players) {
+    for (const player of current.players) {
       const element = playerRefs.current.get(player.id)
-      if (element) moveTo(element, playerPosition(player))
+      if (element) moveTo(element, positionOf(player.id))
     }
 
     if (ballRef.current) moveTo(ballRef.current, currentBallPosition())
@@ -87,101 +96,112 @@ export default function Whiteboard() {
     if (timeLabelRef.current) timeLabelRef.current.textContent = `${(t / 1000).toFixed(1)} s`
 
     function currentBallPosition() {
-      if (recording?.kind === Recording.BALL) return recording.point
-      const holderId = ballHolderAt(ball, t)
-      if (!holderId) return ballPositionAt(ball, players, t)
-      const holder = players.find((player) => player.id === holderId)
-      const position = playerPosition(holder)
-      const offset = HELD_BALL_OFFSET[holder.side]
-      return { x: position.x + offset.x, y: position.y + offset.y }
+      if (drag?.kind === Dragging.BALL) return drag.point
+      // While its holder is dragged, the ball moves with them.
+      const holderId = drag && current.steps[drag.step].ball.holderId
+      if (draggedPlayer && holderId === draggedPlayer) {
+        const holder = current.players.find((player) => player.id === holderId)
+        return heldBallPosition(holder, drag.point)
+      }
+      return ballPositionAt(current, t)
     }
   })
 
-  function startRecording(kind, id, event) {
+  function goToStep(index, current = play) {
     const now = wallClock()
-    const t = clock.timeAt(now)
-    const { players, ball } = playRef.current
+    clock.pause(now)
+    clock.setDuration(playDuration(current), now)
+    clock.seek(stepTime(index), now)
+    setIsPlaying(false)
+    setSelectedStep(index)
+  }
 
-    const holderId = kind === Recording.BALL ? ballHolderAt(ball, t) : null
-    // The ball can only be dragged away from the player holding it.
-    if (kind === Recording.BALL && !holderId) return
+  function commit(next, step) {
+    playRef.current = next
+    setPlay(next)
+    goToStep(step, next)
+  }
 
-    const grabbedId = kind === Recording.BALL ? holderId : id
-    const start = positionAt(players.find((player) => player.id === grabbedId).trajectory, t)
-    const recorder = createTrajectoryRecorder(kind === Recording.PLAYER ? { constrain: clampToCourt } : {})
-    recorder.start(t, start)
-    recordingRef.current = { kind, id, holderId, recorder, point: start }
+  function startDrag(kind, id, event) {
+    // Editing always happens on a step: pause and snap to the nearest one.
+    const step = nearestStep(play, clock.timeAt(wallClock()))
+    goToStep(step)
 
-    clock.setDuration(Infinity, now)
-    clock.play(now)
+    const { positions, ball } = play.steps[step]
+    let start
+    if (kind === Dragging.PLAYER) {
+      start = positions[id]
+    } else {
+      // A ball that is already in the goal cannot be moved.
+      if (!ball.holderId) return
+      const holder = play.players.find((player) => player.id === ball.holderId)
+      start = heldBallPosition(holder, positions[holder.id])
+    }
+
+    const pointer = toCourtPoint(svgRef.current, event)
+    dragRef.current = {
+      kind,
+      id,
+      step,
+      start,
+      point: start,
+      offset: { x: start.x - pointer.x, y: start.y - pointer.y },
+    }
     svgRef.current.setPointerCapture?.(event.pointerId)
     setMessage(null)
   }
 
   function handlePointerMove(event) {
-    const recording = recordingRef.current
-    if (!recording) return
-    const point = toCourtPoint(svgRef.current, event)
-    recording.recorder.sample(clock.timeAt(wallClock()), point)
-    recording.point = recording.kind === Recording.PLAYER ? clampToCourt(point) : point
+    const drag = dragRef.current
+    if (!drag) return
+    const pointer = toCourtPoint(svgRef.current, event)
+    const point = { x: pointer.x + drag.offset.x, y: pointer.y + drag.offset.y }
+    drag.point = drag.kind === Dragging.PLAYER ? clampToCourt(point) : point
   }
 
   function handlePointerUp(event) {
-    const recording = recordingRef.current
-    if (!recording) return
+    const drag = dragRef.current
+    if (!drag) return
     handlePointerMove(event)
-    recordingRef.current = null
+    dragRef.current = null
 
-    const now = wallClock()
-    const trajectory = recording.recorder.finish()
-    let next = playRef.current
+    const moved = Math.hypot(drag.point.x - drag.start.x, drag.point.y - drag.start.y)
+    if (moved < MIN_DRAG_DISTANCE) return
 
-    // A tap without movement is not a recording: it must not erase what the element does afterwards.
-    if (trajectory.length > 1) {
-      if (recording.kind === Recording.PLAYER) {
-        next = recordPlayerLayer(next, recording.id, trajectory)
-      } else {
-        const release = resolveBallRelease({
-          players: next.players,
-          holderId: recording.holderId,
-          point: recording.point,
-          t: clock.timeAt(now),
-        })
-        if (release) next = { ...next, ball: recordBallAction(next.ball, { ...release, trajectory }) }
-        else setMessage(INVALID_RELEASE_MESSAGE)
-      }
+    if (drag.kind === Dragging.PLAYER) {
+      commit(movePlayer(play, drag.step, drag.id, drag.point), drag.step)
+      return
     }
 
-    clock.pause(now)
-    clock.setDuration(playDuration(next), now)
-    playRef.current = next
-    setPlay(next)
-    setIsPlaying(false)
+    const { positions, ball } = play.steps[drag.step]
+    const release = resolveBallRelease({ players: play.players, positions, holderId: ball.holderId, point: drag.point })
+    if (!release) {
+      setMessage(INVALID_RELEASE_MESSAGE)
+      return
+    }
+    const nextBall = release.type === BallActionType.SHOT ? { goal: drag.point } : { holderId: release.toPlayerId }
+    commit(moveBall(play, drag.step, nextBall), drag.step)
   }
 
   function togglePlay() {
     const now = wallClock()
-    if (isPlaying) clock.pause(now)
-    else clock.play(now)
+    if (isPlaying) {
+      clock.pause(now)
+      setSelectedStep(nearestStep(play, clock.timeAt(now)))
+    } else {
+      clock.play(now)
+    }
     setIsPlaying(!isPlaying)
+  }
+
+  function addStepAfterSelected() {
+    commit(addStep(play, selectedStep), selectedStep + 1)
   }
 
   function restart() {
     if (!window.confirm(RESTART_CONFIRMATION)) return
-    const next = resetPlay(play)
-    const now = wallClock()
-    clock.pause(now)
-    clock.setDuration(0, now)
-    playRef.current = next
-    setPlay(next)
-    setIsPlaying(false)
     setMessage(null)
-  }
-
-  function changeGoalkeeper(enabled) {
-    const next = setPlayGoalkeeper(play, enabled)
-    clock.setDuration(playDuration(next), wallClock())
-    setPlay(next)
+    commit(resetPlay(play), 0)
   }
 
   const labels = playerLabels(play.players)
@@ -210,10 +230,10 @@ export default function Whiteboard() {
             label={labels.get(player.id).label}
             number={labels.get(player.id).number}
             elementRef={bindPlayerRef(player.id)}
-            onPointerDown={(event) => startRecording(Recording.PLAYER, player.id, event)}
+            onPointerDown={(event) => startDrag(Dragging.PLAYER, player.id, event)}
           />
         ))}
-        <BallToken elementRef={ballRef} onPointerDown={(event) => startRecording(Recording.BALL, null, event)} />
+        <BallToken elementRef={ballRef} onPointerDown={(event) => startDrag(Dragging.BALL, null, event)} />
       </svg>
 
       {message && (
@@ -221,6 +241,13 @@ export default function Whiteboard() {
           {message}
         </p>
       )}
+
+      <StepBar
+        count={play.steps.length}
+        selected={selectedStep}
+        onSelect={(index) => goToStep(index)}
+        onAdd={addStepAfterSelected}
+      />
 
       <PlaybackControls
         isPlaying={isPlaying}
@@ -231,7 +258,7 @@ export default function Whiteboard() {
         onTogglePlay={togglePlay}
         onSeek={(t) => clock.seek(t, wallClock())}
         onRateChange={(rate) => clock.setRate(rate, wallClock())}
-        onGoalkeeperChange={changeGoalkeeper}
+        onGoalkeeperChange={(enabled) => commit(setPlayGoalkeeper(play, enabled), selectedStep)}
       />
 
       <PlayActions onRestart={restart} />

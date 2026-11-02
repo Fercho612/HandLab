@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { GOALKEEPER_START } from './court.js'
 import { RosterError, setGoalkeeperEnabled, validateRoster } from './roster.js'
 
 const attacker = (id) => ({ id, side: 'attack', role: 'field' })
@@ -52,10 +51,10 @@ describe('validateRoster', () => {
 describe('setGoalkeeperEnabled', () => {
   const players = [attacker('a'), defender('d')]
 
-  it('adds a goalkeeper standing in the goal when enabled', () => {
+  it('adds a goalkeeper when enabled', () => {
     expect(setGoalkeeperEnabled(players, true, 'gk')).toEqual([
       ...players,
-      { id: 'gk', side: 'defense', role: 'goalkeeper', trajectory: [{ t: 0, ...GOALKEEPER_START }] },
+      { id: 'gk', side: 'defense', role: 'goalkeeper' },
     ])
   })
 
