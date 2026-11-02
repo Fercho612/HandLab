@@ -5,7 +5,8 @@
  * `now` is a wall-clock timestamp in milliseconds (the one `requestAnimationFrame` provides);
  * it is passed in so the clock stays deterministic and testable.
  */
-export function createPlaybackClock({ duration }) {
+export function createPlaybackClock({ duration: initialDuration }) {
+  let duration = initialDuration
   let anchorTime = 0
   let anchorNow = 0
   let rate = 1
@@ -43,6 +44,13 @@ export function createPlaybackClock({ duration }) {
     seek(t, now) {
       anchorTime = clamp(t)
       anchorNow = now
+    },
+
+    /** Recording uses `Infinity` so time keeps running past the current end of the play. */
+    setDuration(newDuration, now) {
+      reanchor(now)
+      duration = newDuration
+      anchorTime = clamp(anchorTime)
     },
 
     setRate(newRate, now) {

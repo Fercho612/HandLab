@@ -73,3 +73,20 @@ describe('createPlaybackClock', () => {
     expect(() => clock.setRate(0, 0)).toThrow('Playback rate must be positive')
   })
 })
+
+describe('setDuration', () => {
+  it('lets time run past the previous end while recording', () => {
+    const clock = createPlaybackClock({ duration: 1000 })
+    clock.setDuration(Infinity, 0)
+    clock.play(0)
+    expect(clock.timeAt(3000)).toBe(3000)
+  })
+
+  it('pulls the current time back when the play gets shorter', () => {
+    const clock = createPlaybackClock({ duration: Infinity })
+    clock.play(0)
+    clock.pause(4000)
+    clock.setDuration(2500, 4000)
+    expect(clock.timeAt(4000)).toBe(2500)
+  })
+})
