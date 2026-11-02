@@ -67,7 +67,10 @@ HandLab/
 - No hay modo sin conexión. Si el usuario no tiene conexión al intentar una acción que la requiere, se le notifica que no tiene conexión y la acción no se ejecuta.
 - Autenticación: email + contraseña. El backend emite un JWT de acceso (vida corta) y un refresh token, ambos en cookies httpOnly. Las contraseñas se guardan hasheadas (argon2 o bcrypt).
 - Las jugadas se arman por pasos (keyframes): cada paso guarda la posición de cada jugador y el estado de la pelota. Al reproducir, todo se interpola linealmente entre pasos consecutivos; cada transición dura 1 s.
-- Agregar un paso copia el paso actual; luego se mueven los jugadores o la pelota en ese paso.
+- Los pasos se numeran desde 0: el Paso 0 es la formación inicial y no se puede eliminar.
+- Agregar un paso copia el último paso y lo agrega al final; luego se mueven los jugadores o la pelota en ese paso.
+- Modificar un paso que tiene pasos siguientes elimina esos pasos, previa advertencia al usuario.
+- Eliminar un paso elimina también los pasos siguientes; si los hay, se advierte antes.
 - Jugadores por lado: mínimo 1, máximo 7.
 - El lado defensivo puede tener como máximo 6 jugadores de campo.
 - El arquero es opcional: se habilita con una opción y, al habilitarlo, aparece directamente en el arco.
@@ -75,7 +78,7 @@ HandLab/
 - Los jugadores se mueven libremente dentro de la cancha.
 - Cada jugada tiene una pelota, modelada como SVG y animada con el mismo modelo de pasos que los jugadores.
 - La pelota sigue al jugador que la tiene: mientras está en posesión, se dibuja al frente de ese jugador (los atacantes miran al arco, los defensores a la mitad de cancha).
-- La pelota solo se mueve por sí misma cuando el usuario la selecciona específicamente. Ese movimiento es un pase (termina en otro jugador, que pasa a tenerla) o un lanzamiento al arco, y ocurre en la transición entre el paso anterior y el paso editado. El cambio se aplica también a los pasos siguientes que tenían la pelota en el mismo estado.
+- La pelota solo se mueve por sí misma cuando el usuario la selecciona específicamente. Ese movimiento es un pase (termina en otro jugador, que pasa a tenerla) o un lanzamiento al arco, y ocurre en la transición entre el paso anterior y el paso editado.
 - Las lecciones (sección "Aprende") se componen de textos y jugadas. Cualquier usuario puede crear lecciones.
 - Jugadas y lecciones son públicas o privadas. Las públicas aparecen en un feed.
 - Cada usuario tiene un perfil con foto y descripción.
