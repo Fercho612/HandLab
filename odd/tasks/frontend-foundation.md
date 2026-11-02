@@ -14,11 +14,11 @@ Branch: `feat/frontend-foundation` · Delivery: ask-on-risk · Test runner: Vite
 
 ## Tasks
 
-- [ ] T1 (S1) scaffold frontend · route: inline · commit: —
-- [ ] T2 (S2) `positionAt` · route: inline · commit: —
-- [ ] T3 (S3) trajectory simplification (RDP) · route: inline · commit: —
-- [ ] T4 (S4) roster rules · route: inline · commit: —
-- [ ] T5 (S5, A1) court bounds and ball possession, pass and shot · route: inline · commit: —
+- [x] T1 (S1) scaffold frontend · route: inline · commit: a74d1e1 (build + lint green)
+- [x] T2 (S2) `positionAt` · route: inline · commit: 1ecd881 (RED 6 failed → GREEN 6 passed)
+- [x] T3 (S3) trajectory simplification (RDP) · route: inline · commit: d3c232f (RED 6 → GREEN)
+- [x] T4 (S4) roster rules · route: inline · commit: aae9e48 (RED 8 → GREEN)
+- [x] T5 (S5, A1) court bounds and ball possession, pass and shot · route: inline · commits: b3afcc1, d72ab82 (RED 13 → GREEN; suite 33 passed)
 
 Route evidence: no Writer trigger (units are sequential and small), so every task runs inline.
 
@@ -27,3 +27,6 @@ Route evidence: no Writer trigger (units are sequential and small), so every tas
 - L1 (2026-11-02): "Por ahora empezemos con el front y dime si no quedo algo claro"
 - L2 (2026-11-02): "La pelota sigue al jugador, solo se mueve cuando se seleciona especificamente a ella. Los jugadores se pueden mover libremente por el dominio de la cancha, la pelota tiene que ir de jugador en jugador, como un pase o puede ser un lanzamiento al arco"
 - L3: create-vite 9 ships oxlint instead of ESLint; kept it since `npm run lint` is unchanged.
+- L4: `npm audit` reports deepmerge/glob advisories inside workbox-build (build-time only, pulled by vite-plugin-pwa 2.0.0); the only automatic fix downgrades to vite-plugin-pwa 1.1.0. Pending user decision.
+- L5: simplification uses synchronized Euclidean distance so pauses keep their timing. Assumptions: catch radius 1 m; a release inside the goal is a shot before checking for receivers; the goalkeeper's starting position in goal is not validated yet.
+- L6: next step is the playback clock (`requestAnimationFrame`) and the whiteboard SVG; blocked on how several players are recorded with a single pointer.
