@@ -6,6 +6,8 @@ import {
   addStep,
   ballPositionAt,
   createDefaultPlay,
+  deleteStep,
+  followingSteps,
   moveBall,
   movePlayer,
   nearestStep,
@@ -32,6 +34,21 @@ const VIEW_BOX = `0 ${-GOAL_SIDE_MARGIN} ${COURT.WIDTH} ${COURT.LENGTH + GOAL_SI
 const MIN_DRAG_DISTANCE = 0.05
 const INVALID_RELEASE_MESSAGE = 'La pelota tiene que terminar en un jugador o en el arco.'
 const RESTART_CONFIRMATION = '¿Reiniciar la pizarra? Se borrará todo lo grabado.'
+
+/** Describes the steps after `step` that an edit or a deletion removes, for the confirmation messages. */
+function followingStepsWarning(action, step, count) {
+  const steps = count === 1 ? `el paso siguiente (Paso ${step + 1})` : `los pasos siguientes (Paso ${step + 1} a Paso ${step + count})`
+  const verb = count === 1 ? 'se eliminará' : 'se eliminarán'
+  return action === 'modify'
+    ? `Si modificas el Paso ${step} ${verb} ${steps}. ¿Continuar?`
+    : `Si eliminas el Paso ${step} también ${verb} ${steps}. ¿Continuar?`
+}
+
+/** Modifying or deleting a step removes the ones after it, so the user confirms first when there are any. */
+function confirmFollowingSteps(action, play, step) {
+  const count = followingSteps(play, step)
+  return count === 0 || window.confirm(followingStepsWarning(action, step, count))
+}
 
 /** Wall-clock time for the playback clock; only called from event handlers and the animation loop. */
 const wallClock = () => performance.now()
@@ -169,6 +186,7 @@ export default function Whiteboard() {
     if (moved < MIN_DRAG_DISTANCE) return
 
     if (drag.kind === Dragging.PLAYER) {
+      if (!confirmFollowingSteps('modify', play, drag.step)) return
       commit(movePlayer(play, drag.step, drag.id, drag.point), drag.step)
       return
     }
@@ -179,6 +197,7 @@ export default function Whiteboard() {
       setMessage(INVALID_RELEASE_MESSAGE)
       return
     }
+    if (!confirmFollowingSteps('modify', play, drag.step)) return
     const nextBall = release.type === BallActionType.SHOT ? { goal: drag.point } : { holderId: release.toPlayerId }
     commit(moveBall(play, drag.step, nextBall), drag.step)
   }
@@ -194,8 +213,13 @@ export default function Whiteboard() {
     setIsPlaying(!isPlaying)
   }
 
-  function addStepAfterSelected() {
-    commit(addStep(play, selectedStep), selectedStep + 1)
+  function addStepAtEnd() {
+    commit(addStep(play), play.steps.length)
+  }
+
+  function deleteSelectedStep() {
+    if (!confirmFollowingSteps('delete', play, selectedStep)) return
+    commit(deleteStep(play, selectedStep), selectedStep - 1)
   }
 
   function restart() {
@@ -246,7 +270,8 @@ export default function Whiteboard() {
         count={play.steps.length}
         selected={selectedStep}
         onSelect={(index) => goToStep(index)}
-        onAdd={addStepAfterSelected}
+        onAdd={addStepAtEnd}
+        onDelete={deleteSelectedStep}
       />
 
       <PlaybackControls

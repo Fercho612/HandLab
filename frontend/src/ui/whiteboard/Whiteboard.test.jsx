@@ -55,11 +55,11 @@ describe('Whiteboard', () => {
     expect(board()).toHaveAttribute('viewBox', '0 -0.625 20 20.625')
   })
 
-  it('starts with a single selected step', () => {
+  it('starts with a single selected step numbered 0', () => {
     renderBoard()
 
-    expect(button('Paso 1')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.queryByRole('button', { name: 'Paso 2' })).not.toBeInTheDocument()
+    expect(button('Paso 0')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'Paso 1' })).not.toBeInTheDocument()
     expect(timeline()).toHaveAttribute('max', '0')
   })
 
@@ -69,8 +69,8 @@ describe('Whiteboard', () => {
     fireEvent.click(button('Agregar paso'))
     advance(16)
 
-    expect(button('Paso 2')).toHaveAttribute('aria-pressed', 'true')
-    expect(button('Paso 1')).toHaveAttribute('aria-pressed', 'false')
+    expect(button('Paso 1')).toHaveAttribute('aria-pressed', 'true')
+    expect(button('Paso 0')).toHaveAttribute('aria-pressed', 'false')
     expect(timeline()).toHaveAttribute('max', '1000')
   })
 
@@ -104,18 +104,94 @@ describe('Whiteboard', () => {
     expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(0 1)')
   })
 
-  it('edits the step that is selected', () => {
+  it('edits the last step without asking', () => {
+    vi.spyOn(window, 'confirm')
     renderBoard()
     fireEvent.click(button('Agregar paso'))
-    fireEvent.click(button('Paso 1'))
+
+    drag(token('Atacante 1'), { x: 1, y: 1 }, { x: 2, y: 2 })
+
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(2 2)')
+  })
+
+  it('deletes the following steps after confirming a change to an earlier step', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderBoard()
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Paso 0'))
     advance(16)
 
     drag(token('Atacante 1'), { x: 1, y: 1 }, { x: 2, y: 2 })
 
-    seek(0)
+    expect(window.confirm).toHaveBeenCalledWith(
+      'Si modificas el Paso 0 se eliminarán los pasos siguientes (Paso 1 a Paso 2). ¿Continuar?',
+    )
+    expect(screen.queryByRole('button', { name: 'Paso 1' })).not.toBeInTheDocument()
+    expect(timeline()).toHaveAttribute('max', '0')
     expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(2 2)')
-    seek(1000)
-    expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(1 1)')
+  })
+
+  it('keeps every step when a change to an earlier step is cancelled', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderBoard()
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Paso 0'))
+    advance(16)
+
+    drag(token('Pelota'), { x: 10, y: 10 }, { x: 16, y: 9.5 })
+
+    expect(window.confirm).toHaveBeenCalledWith('Si modificas el Paso 0 se eliminará el paso siguiente (Paso 1). ¿Continuar?')
+    expect(button('Paso 1')).toBeInTheDocument()
+    expect(token('Pelota')).toHaveAttribute('transform', 'translate(10 10)')
+  })
+
+  it('deletes the last step without asking and selects the previous one', () => {
+    vi.spyOn(window, 'confirm')
+    renderBoard()
+    fireEvent.click(button('Agregar paso'))
+
+    fireEvent.click(button('Eliminar paso'))
+
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Paso 1' })).not.toBeInTheDocument()
+    expect(button('Paso 0')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('deletes a step and the ones after it after confirming', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderBoard()
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Paso 1'))
+
+    fireEvent.click(button('Eliminar paso'))
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      'Si eliminas el Paso 1 también se eliminarán los pasos siguientes (Paso 2 a Paso 3). ¿Continuar?',
+    )
+    expect(screen.queryByRole('button', { name: 'Paso 1' })).not.toBeInTheDocument()
+    expect(button('Paso 0')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('keeps the steps when deleting is cancelled', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderBoard()
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Agregar paso'))
+    fireEvent.click(button('Paso 1'))
+
+    fireEvent.click(button('Eliminar paso'))
+
+    expect(button('Paso 2')).toBeInTheDocument()
+  })
+
+  it('cannot delete the starting step', () => {
+    renderBoard()
+
+    expect(button('Eliminar paso')).toBeDisabled()
   })
 
   it('passes the ball to a teammate during the transition', () => {
@@ -172,7 +248,7 @@ describe('Whiteboard', () => {
     renderBoard()
     fireEvent.click(button('Agregar paso'))
     drag(token('Atacante 1'), { x: 1, y: 1 }, { x: 5, y: 1 })
-    fireEvent.click(button('Paso 1'))
+    fireEvent.click(button('Paso 0'))
 
     fireEvent.click(button('Reproducir'))
     advance(500)
@@ -187,7 +263,7 @@ describe('Whiteboard', () => {
     renderBoard()
     fireEvent.click(button('Agregar paso'))
     fireEvent.click(button('Agregar paso'))
-    fireEvent.click(button('Paso 1'))
+    fireEvent.click(button('Paso 0'))
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Velocidad' }), { target: { value: '1.5' } })
     fireEvent.click(button('Reproducir'))
@@ -207,7 +283,7 @@ describe('Whiteboard', () => {
     advance(16)
 
     expect(window.confirm).toHaveBeenCalledWith('¿Reiniciar la pizarra? Se borrará todo lo grabado.')
-    expect(screen.queryByRole('button', { name: 'Paso 2' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Paso 1' })).not.toBeInTheDocument()
     expect(timeline()).toHaveAttribute('max', '0')
     expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(1 1)')
   })
@@ -219,7 +295,7 @@ describe('Whiteboard', () => {
 
     fireEvent.click(button('Reiniciar'))
 
-    expect(button('Paso 2')).toBeInTheDocument()
+    expect(button('Paso 1')).toBeInTheDocument()
   })
 
   it('shows the save and delete buttons', () => {

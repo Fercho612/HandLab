@@ -22,13 +22,21 @@ export function nearestStep(play, t) {
   return Math.min(Math.max(index, 0), play.steps.length - 1)
 }
 
-/** Inserts a copy of the step at `index` right after it. */
-export function addStep(play, index) {
-  const source = play.steps[index]
-  const copy = { positions: { ...source.positions }, ball: { ...source.ball } }
-  return { ...play, steps: [...play.steps.slice(0, index + 1), copy, ...play.steps.slice(index + 1)] }
+export const followingSteps = (play, index) => play.steps.length - 1 - index
+
+/** Appends a copy of the last step. */
+export function addStep(play) {
+  const last = play.steps[play.steps.length - 1]
+  return { ...play, steps: [...play.steps, { positions: { ...last.positions }, ball: { ...last.ball } }] }
 }
 
+/** Deletes the step and every step after it. The starting step always stays. */
+export function deleteStep(play, index) {
+  if (index === 0) throw new Error('The starting step cannot be deleted')
+  return { ...play, steps: play.steps.slice(0, index) }
+}
+
+/** Moves a player in a step. Modifying a step deletes the steps after it. */
 export function movePlayer(play, stepIndex, playerId, point) {
   return updateStep(play, stepIndex, (step) => ({
     ...step,
@@ -38,21 +46,10 @@ export function movePlayer(play, stepIndex, playerId, point) {
 
 /**
  * Sets the ball state of a step: a pass (`{ holderId }`) or a shot (`{ goal }`) that happens during the
- * transition into that step. Following steps that still had the previous ball state get the new one too,
- * so the ball does not travel back on its own.
+ * transition into that step. Modifying a step deletes the steps after it.
  */
 export function moveBall(play, stepIndex, ball) {
-  const previous = play.steps[stepIndex].ball
-  let propagating = true
-  const steps = play.steps.map((step, index) => {
-    if (index < stepIndex) return step
-    if (index > stepIndex && !(propagating && sameBall(step.ball, previous))) {
-      propagating = false
-      return step
-    }
-    return { ...step, ball: { ...ball } }
-  })
-  return { ...play, steps }
+  return updateStep(play, stepIndex, (step) => ({ ...step, ball: { ...ball } }))
 }
 
 export function playerPositionAt(play, playerId, t) {
@@ -145,7 +142,9 @@ function transitionAt(play, t) {
 }
 
 function updateStep(play, stepIndex, update) {
-  return { ...play, steps: play.steps.map((step, index) => (index === stepIndex ? update(step) : step)) }
+  const steps = play.steps.slice(0, stepIndex + 1)
+  steps[stepIndex] = update(steps[stepIndex])
+  return { ...play, steps }
 }
 
 function sameBall(a, b) {

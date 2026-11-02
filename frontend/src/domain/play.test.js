@@ -4,6 +4,8 @@ import {
   addStep,
   ballPositionAt,
   createDefaultPlay,
+  deleteStep,
+  followingSteps,
   GOALKEEPER_ID,
   moveBall,
   movePlayer,
@@ -17,7 +19,8 @@ import {
 } from './play.js'
 import { Side, validateRoster } from './roster.js'
 
-const twoSteps = () => addStep(createDefaultPlay(), 0)
+const twoSteps = () => addStep(createDefaultPlay())
+const threeSteps = () => addStep(twoSteps())
 
 describe('createDefaultPlay', () => {
   it('starts with one step, a valid roster and the ball held by an attacker', () => {
@@ -32,36 +35,30 @@ describe('createDefaultPlay', () => {
 })
 
 describe('addStep', () => {
-  it('inserts a copy of the step after it', () => {
-    const play = twoSteps()
-    expect(play.steps).toHaveLength(2)
-    expect(play.steps[1]).toEqual(play.steps[0])
-    expect(play.steps[1]).not.toBe(play.steps[0])
-  })
-
-  it('inserts in the middle without touching the other steps', () => {
-    const play = movePlayer(twoSteps(), 1, 'a1', { x: 5, y: 5 })
-    const withMiddle = addStep(play, 0)
-    expect(withMiddle.steps.map((step) => step.positions.a1)).toEqual([
-      { x: 1, y: 1 },
-      { x: 1, y: 1 },
-      { x: 5, y: 5 },
-    ])
+  it('appends a copy of the last step', () => {
+    const play = addStep(movePlayer(twoSteps(), 1, 'a1', { x: 5, y: 5 }))
+    expect(play.steps).toHaveLength(3)
+    expect(play.steps[2]).toEqual(play.steps[1])
+    expect(play.steps[2]).not.toBe(play.steps[1])
   })
 })
 
 describe('playDuration and step times', () => {
   it('lasts one transition per extra step', () => {
-    const play = addStep(twoSteps(), 1)
-    expect(playDuration(play)).toBe(2 * STEP_DURATION)
+    expect(playDuration(threeSteps())).toBe(2 * STEP_DURATION)
     expect(stepTime(2)).toBe(2 * STEP_DURATION)
   })
 
   it('finds the step nearest to a time', () => {
-    const play = addStep(twoSteps(), 1)
+    const play = threeSteps()
     expect(nearestStep(play, 400)).toBe(0)
     expect(nearestStep(play, 600)).toBe(1)
     expect(nearestStep(play, 99999)).toBe(2)
+  })
+
+  it('counts the steps after a step', () => {
+    expect(followingSteps(threeSteps(), 0)).toBe(2)
+    expect(followingSteps(threeSteps(), 2)).toBe(0)
   })
 })
 
@@ -75,6 +72,12 @@ describe('movePlayer', () => {
   it('keeps the player inside the court', () => {
     const play = movePlayer(twoSteps(), 1, 'a1', { x: -3, y: 25 })
     expect(play.steps[1].positions.a1).toEqual({ x: 0, y: 20 })
+  })
+
+  it('deletes the steps after the modified one', () => {
+    const play = movePlayer(threeSteps(), 0, 'a1', { x: 2, y: 2 })
+    expect(play.steps).toHaveLength(1)
+    expect(play.steps[0].positions.a1).toEqual({ x: 2, y: 2 })
   })
 })
 
@@ -111,32 +114,33 @@ describe('ballPositionAt', () => {
   })
 
   it('flies into the goal on a shot and stays there', () => {
-    const play = addStep(moveBall(twoSteps(), 1, { goal: { x: 10, y: -0.25 } }), 1)
+    const play = addStep(moveBall(twoSteps(), 1, { goal: { x: 10, y: -0.25 } }))
     expect(ballPositionAt(play, STEP_DURATION / 2)).toEqual({ x: 10, y: 4.875 })
     expect(ballPositionAt(play, 2 * STEP_DURATION)).toEqual({ x: 10, y: -0.25 })
   })
 })
 
 describe('moveBall', () => {
-  it('applies the new ball state to the following steps that had the same one', () => {
-    const play = moveBall(addStep(addStep(twoSteps(), 1), 2), 1, { holderId: 'a4' })
-    expect(play.steps.map((step) => step.ball)).toEqual([
-      { holderId: 'a3' },
-      { holderId: 'a4' },
-      { holderId: 'a4' },
-      { holderId: 'a4' },
-    ])
+  it('sets the ball state of the step', () => {
+    const play = moveBall(twoSteps(), 1, { holderId: 'a4' })
+    expect(play.steps.map((step) => step.ball)).toEqual([{ holderId: 'a3' }, { holderId: 'a4' }])
   })
 
-  it('stops at the next step where the ball was already elsewhere', () => {
-    const base = moveBall(addStep(addStep(twoSteps(), 1), 2), 3, { holderId: 'a5' })
-    const play = moveBall(base, 1, { holderId: 'a4' })
-    expect(play.steps.map((step) => step.ball)).toEqual([
-      { holderId: 'a3' },
-      { holderId: 'a4' },
-      { holderId: 'a4' },
-      { holderId: 'a5' },
-    ])
+  it('deletes the steps after the modified one', () => {
+    const play = moveBall(threeSteps(), 1, { holderId: 'a4' })
+    expect(play.steps).toHaveLength(2)
+  })
+})
+
+describe('deleteStep', () => {
+  it('deletes the step and every step after it', () => {
+    const play = deleteStep(movePlayer(addStep(threeSteps()), 1, 'a1', { x: 4, y: 4 }), 2)
+    expect(play.steps).toHaveLength(2)
+    expect(play.steps[1].positions.a1).toEqual({ x: 4, y: 4 })
+  })
+
+  it('does not delete the starting step', () => {
+    expect(() => deleteStep(twoSteps(), 0)).toThrow('The starting step cannot be deleted')
   })
 })
 
@@ -148,8 +152,7 @@ describe('setPlayGoalkeeper', () => {
   })
 
   it('removes the goalkeeper and gives the ball back to whoever had it before', () => {
-    const withGoalkeeper = setPlayGoalkeeper(addStep(twoSteps(), 1), true)
-    const play = moveBall(withGoalkeeper, 1, { holderId: GOALKEEPER_ID })
+    const play = addStep(moveBall(setPlayGoalkeeper(twoSteps(), true), 1, { holderId: GOALKEEPER_ID }))
 
     const updated = setPlayGoalkeeper(play, false)
 
@@ -161,7 +164,7 @@ describe('setPlayGoalkeeper', () => {
 
 describe('resetPlay', () => {
   it('keeps only the first step', () => {
-    const play = moveBall(movePlayer(addStep(twoSteps(), 1), 2, 'a1', { x: 6, y: 4 }), 1, { holderId: 'a4' })
+    const play = moveBall(movePlayer(threeSteps(), 2, 'a1', { x: 6, y: 4 }), 2, { holderId: 'a4' })
     expect(resetPlay(play)).toEqual(createDefaultPlay())
   })
 

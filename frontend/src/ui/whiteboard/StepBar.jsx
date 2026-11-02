@@ -1,6 +1,6 @@
 import styles from './Whiteboard.module.css'
 
-export default function StepBar({ count, selected, onSelect, onAdd }) {
+export default function StepBar({ count, selected, onSelect, onAdd, onDelete }) {
   return (
     <div className={styles.controls}>
       {Array.from({ length: count }, (_, index) => (
@@ -11,11 +11,14 @@ export default function StepBar({ count, selected, onSelect, onAdd }) {
           aria-pressed={index === selected}
           onClick={() => onSelect(index)}
         >
-          Paso {index + 1}
+          Paso {index}
         </button>
       ))}
       <button type="button" onClick={onAdd}>
         Agregar paso
+      </button>
+      <button type="button" onClick={onDelete} disabled={selected === 0}>
+        Eliminar paso
       </button>
     </div>
   )
