@@ -74,3 +74,12 @@ export function setPlayGoalkeeper(play, enabled) {
   const actions = firstPassToGoalkeeper === -1 ? play.ball.actions : play.ball.actions.slice(0, firstPassToGoalkeeper)
   return { ...play, players, ball: { ...play.ball, actions } }
 }
+
+/** Erases every recording: players go back to where they started and the ball to its initial holder. */
+export function resetPlay(play) {
+  return {
+    ...play,
+    players: play.players.map((player) => ({ ...player, trajectory: [{ ...player.trajectory[0], t: 0 }] })),
+    ball: { ...play.ball, actions: [] },
+  }
+}

@@ -35,6 +35,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('Whiteboard', () => {
@@ -157,5 +158,39 @@ describe('Whiteboard', () => {
     // 1.5 s of play take 1 s at 1.5x, so playback has ended; at 1x it would still be running (t = 1.1 s).
     expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(4 1)')
     expect(screen.getByRole('button', { name: 'Reproducir' })).toBeInTheDocument()
+  })
+
+  it('erases every recording after confirming a restart', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<Whiteboard />)
+    advance(16)
+    drag(token('Atacante 1'), [{ x: 1, y: 1 }, { x: 3, y: 1 }], 500)
+    drag(token('Pelota'), [{ x: 10, y: 10.5 }, { x: 16, y: 9.5 }], 400)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar' }))
+    advance(16)
+
+    expect(window.confirm).toHaveBeenCalledWith('¿Reiniciar la pizarra? Se borrará todo lo grabado.')
+    expect(timeline()).toHaveAttribute('max', '0')
+    expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(1 1)')
+    expect(token('Pelota')).toHaveAttribute('transform', 'translate(10 10)')
+  })
+
+  it('keeps the recordings when the restart is cancelled', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<Whiteboard />)
+    advance(16)
+    drag(token('Atacante 1'), [{ x: 1, y: 1 }, { x: 3, y: 1 }], 500)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar' }))
+
+    expect(timeline()).toHaveAttribute('max', '500')
+  })
+
+  it('shows the save and delete buttons', () => {
+    render(<Whiteboard />)
+
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Eliminar' })).toBeInTheDocument()
   })
 })

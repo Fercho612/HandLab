@@ -3,10 +3,11 @@ import { createPlaybackClock } from '../../application/playbackClock.js'
 import { createTrajectoryRecorder } from '../../application/trajectoryRecorder.js'
 import { ballHolderAt, ballPositionAt, recordBallAction, resolveBallRelease } from '../../domain/ball.js'
 import { COURT, clampToCourt } from '../../domain/court.js'
-import { createDefaultPlay, playDuration, recordPlayerLayer, setPlayGoalkeeper } from '../../domain/play.js'
+import { createDefaultPlay, playDuration, recordPlayerLayer, resetPlay, setPlayGoalkeeper } from '../../domain/play.js'
 import { Role, Side } from '../../domain/roster.js'
 import { positionAt } from '../../domain/trajectory.js'
 import CourtLines from './CourtLines.jsx'
+import PlayActions from './PlayActions.jsx'
 import PlaybackControls from './PlaybackControls.jsx'
 import { BallToken, PlayerToken } from './Tokens.jsx'
 import { toCourtPoint } from './toCourtPoint.js'
@@ -22,6 +23,7 @@ const VIEW_BOX = `0 ${-GOAL_SIDE_MARGIN} ${COURT.WIDTH} ${COURT.LENGTH + GOAL_SI
  */
 const HELD_BALL_OFFSET = { [Side.ATTACK]: { x: 0, y: -0.5 }, [Side.DEFENSE]: { x: 0, y: 0.5 } }
 const INVALID_RELEASE_MESSAGE = 'La pelota tiene que terminar en un jugador o en el arco.'
+const RESTART_CONFIRMATION = '¿Reiniciar la pizarra? Se borrará todo lo grabado.'
 
 /** Wall-clock time for the playback clock; only called from event handlers and the animation loop. */
 const wallClock = () => performance.now()
@@ -164,6 +166,18 @@ export default function Whiteboard() {
     setIsPlaying(!isPlaying)
   }
 
+  function restart() {
+    if (!window.confirm(RESTART_CONFIRMATION)) return
+    const next = resetPlay(play)
+    const now = wallClock()
+    clock.pause(now)
+    clock.setDuration(0, now)
+    playRef.current = next
+    setPlay(next)
+    setIsPlaying(false)
+    setMessage(null)
+  }
+
   function changeGoalkeeper(enabled) {
     const next = setPlayGoalkeeper(play, enabled)
     clock.setDuration(playDuration(next), wallClock())
@@ -219,6 +233,8 @@ export default function Whiteboard() {
         onRateChange={(rate) => clock.setRate(rate, wallClock())}
         onGoalkeeperChange={changeGoalkeeper}
       />
+
+      <PlayActions onRestart={restart} />
     </div>
   )
 }

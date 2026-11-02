@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BallActionType } from './ball.js'
 import { GOALKEEPER_START } from './court.js'
-import { createDefaultPlay, playDuration, recordPlayerLayer, replaceFrom, setPlayGoalkeeper } from './play.js'
+import { createDefaultPlay, playDuration, recordPlayerLayer, replaceFrom, resetPlay, setPlayGoalkeeper } from './play.js'
 import { Side, validateRoster } from './roster.js'
 
 describe('replaceFrom', () => {
@@ -105,5 +105,26 @@ describe('setPlayGoalkeeper', () => {
 
     expect(updated.players.some((player) => player.role === 'goalkeeper')).toBe(false)
     expect(updated.ball.actions).toEqual([pass(0, 500, 'a4')])
+  })
+})
+
+describe('resetPlay', () => {
+  it('erases every recording and puts players back at their starting positions', () => {
+    const recorded = recordPlayerLayer(setPlayGoalkeeper(createDefaultPlay(), true), 'a1', [
+      { t: 0, x: 1, y: 1 },
+      { t: 2000, x: 6, y: 4 },
+    ])
+    const play = {
+      ...recorded,
+      ball: {
+        ...recorded.ball,
+        actions: [{ type: BallActionType.SHOT, trajectory: [{ t: 2500, x: 10, y: 9 }, { t: 3000, x: 10, y: -0.5 }] }],
+      },
+    }
+
+    const reset = resetPlay(play)
+
+    expect(reset).toEqual(setPlayGoalkeeper(createDefaultPlay(), true))
+    expect(playDuration(reset)).toBe(0)
   })
 })
