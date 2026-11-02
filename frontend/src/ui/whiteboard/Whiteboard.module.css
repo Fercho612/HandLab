@@ -1,0 +1,88 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+}
+
+.board {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--color-court);
+  border-radius: 8px;
+  /* Dragging must not scroll or zoom the page on touch screens. */
+  touch-action: none;
+  user-select: none;
+}
+
+.line,
+.area {
+  fill: none;
+  stroke: var(--color-line);
+  stroke-width: 0.08;
+}
+
+.area {
+  fill: rgb(255 255 255 / 0.12);
+}
+
+.dashed {
+  stroke-dasharray: 0.3 0.3;
+}
+
+.goal {
+  fill: rgb(255 255 255 / 0.3);
+  stroke: var(--color-line);
+  stroke-width: 0.1;
+}
+
+.token {
+  cursor: grab;
+}
+
+.token text {
+  fill: #ffffff;
+  font-size: 0.5px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.attack circle {
+  fill: #d64545;
+}
+
+.defense circle {
+  fill: #2b5fad;
+}
+
+.goalkeeper circle {
+  fill: #e0a400;
+}
+
+.ball circle {
+  fill: #ffffff;
+  stroke: #1b1f24;
+  stroke-width: 0.05;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.timeline {
+  flex: 1 1 200px;
+}
+
+.time {
+  min-width: 4em;
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  margin: 0;
+  color: #b42318;
+}
