@@ -10,7 +10,7 @@ Branch: `feat/frontend-foundation` · Delivery: ask-on-risk · Test runner: Vite
 - S3: "Las trayectorias se simplifican antes de guardarse (por ejemplo, Ramer-Douglas-Peucker) para reducir puntos."
 - S4: "Jugadores por lado: mínimo 1, máximo 7." "deberia ser opcional el arquero, entonces quedan como maximo 6 jugadores defensivos y una opcion para habilitar al arquero, cuando se habilite aparece directamente en el arco"
 - S6: "Un único loop con `requestAnimationFrame` y un reloj compartido mueve a todos los jugadores. Esto sincroniza la reproducción y permite pausar, retroceder, cambiar la velocidad y arrastrar la línea de tiempo."
-- S7: Recording by layers ("Como dijiste"): one element is recorded per pass while the already recorded ones play back on the same timeline. Samples are `(t, x, y)` taken while dragging, kept inside the court and simplified before saving.
+- S7: Recording by layers ("Como dijiste"): one element is recorded per pass while the already recorded ones play back on the same timeline. Samples are `(t, x, y)` taken while dragging, kept inside the court and simplified before saving. Re-recording ("La recomendada"): a new recording of an element replaces everything from the moment it starts.
 - S5: "La pelota sigue al jugador, solo se mueve cuando se seleciona especificamente a ella. Los jugadores se pueden mover libremente por el dominio de la cancha, la pelota tiene que ir de jugador en jugador, como un pase o puede ser un lanzamiento al arco"
 - Assumption A1: court coordinates are meters on a 20 m x 20 m half court, goal line at `y = 0`, goal centered at `x = 10` and 3 m wide.
 
@@ -24,7 +24,12 @@ Branch: `feat/frontend-foundation` · Delivery: ask-on-risk · Test runner: Vite
 - [x] T6 (S4) goalkeeper appears in goal when enabled · route: inline · commit: ca4e428 (`setGoalkeeperEnabled`, start at x 10, y 0.5)
 - [x] T7 (S6) shared playback clock · route: inline · commit: e0343a2 (RED 10 → GREEN)
 - [x] T8 (S7) trajectory recorder for one layer · route: inline · commit: 005ca29 (RED 5 → GREEN; suite 51 passed, lint and build green)
-- [ ] T9 (S6, S7) whiteboard SVG with the requestAnimationFrame loop and layer recording · route: inline · blocked on re-recording semantics
+- [x] T9 (S7) play layers (`replaceFrom`, `recordPlayerLayer`, `playDuration`, default play) · route: inline · commit: 4fd590d
+- [x] T10 (S5, S7) ball holder and re-recorded ball actions · route: inline · commit: 4fd590d (RED 6 → GREEN)
+- [x] T11 (S6) clock `setDuration` for recording past the end · route: inline · commit: d915abb (RED 2 → GREEN)
+- [x] T12 (S4, S5) disabling the goalkeeper keeps the ball valid · route: inline · commit: 6068586 (RED 2 → GREEN)
+- [x] T13 (S6, S7) whiteboard at `/pizarra`: court SVG, single rAF loop, controls, player and ball recording · route: inline · commits: 5a97c55 (jsdom + Testing Library), facb0c6 (RED 8 → GREEN; suite 75 passed, lint and build green)
+- [ ] T14 (S6, S7) manual check in a real browser and on a phone (pointer mapping and capture are mocked in jsdom) · pending
 
 Route evidence: no Writer trigger (units are sequential and small), so every task runs inline.
 
@@ -38,3 +43,6 @@ Route evidence: no Writer trigger (units are sequential and small), so every tas
 - L6: next step was the playback clock (`requestAnimationFrame`) and the whiteboard SVG; blocked on how several players are recorded with a single pointer.
 - L7 (2026-11-02): "Como dijiste / Los 2 supuestos estan bien / Ahora que lo pienso, deberia ser opcional el arquero, entonces quedan como maximo 6 jugadores defensivos y una opcion para habilitar al arquero, cuando se habilite aparece directamente en el arco". Court 20x20 m and 1 m catch radius confirmed; recording by layers confirmed.
 - L8: goalkeeper start sits 0.5 m in front of the goal line so a ball released on it is a pass, not a shot. Open question: what re-recording an element that already has a trajectory does.
+- L9 (2026-11-02): "La recomendada" (re-record replaces from its start to the end).
+- L10 (2026-11-02): "Agrega" (add jsdom and Testing Library for UI tests).
+- L11: review assessment over de27094..facb0c6: risk medium, review_due false (under_budget). Default play: 6 attackers vs 6-0 defense without goalkeeper, center back holding the ball. A tap without movement records nothing.
