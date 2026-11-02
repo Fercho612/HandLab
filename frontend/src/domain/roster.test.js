@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { RosterError, validateRoster } from './roster.js'
+import { GOALKEEPER_START } from './court.js'
+import { RosterError, setGoalkeeperEnabled, validateRoster } from './roster.js'
 
 const attacker = (id) => ({ id, side: 'attack', role: 'field' })
 const defender = (id) => ({ id, side: 'defense', role: 'field' })
@@ -14,30 +15,31 @@ describe('validateRoster', () => {
     expect(validateRoster(players)).toEqual([])
   })
 
-  it('accepts the minimum: one attacker and the goalkeeper', () => {
+  it('accepts a defense without goalkeeper', () => {
+    const players = [...many(attacker, 7, 'a'), ...many(defender, 6, 'd')]
+    expect(validateRoster(players)).toEqual([])
+  })
+
+  it('accepts the goalkeeper as the only defender', () => {
     expect(validateRoster([attacker('a'), goalkeeper('gk')])).toEqual([])
   })
 
-  it('requires at least one player per side', () => {
-    expect(validateRoster([goalkeeper('gk')])).toEqual([RosterError.ATTACK_TOO_FEW])
+  it('requires at least one attacker', () => {
+    expect(validateRoster([defender('d')])).toEqual([RosterError.ATTACK_TOO_FEW])
   })
 
   it('rejects more than seven attackers', () => {
-    const players = [...many(attacker, 8, 'a'), goalkeeper('gk')]
+    const players = [...many(attacker, 8, 'a'), defender('d')]
     expect(validateRoster(players)).toEqual([RosterError.ATTACK_TOO_MANY])
   })
 
-  it('requires the defense to have a goalkeeper', () => {
-    expect(validateRoster([attacker('a'), defender('d')])).toEqual([
-      RosterError.DEFENSE_GOALKEEPER_REQUIRED,
-    ])
+  it('requires at least one defender', () => {
+    expect(validateRoster([attacker('a')])).toEqual([RosterError.DEFENSE_TOO_FEW])
   })
 
-  it('rejects an empty defense', () => {
-    expect(validateRoster([attacker('a')])).toEqual([
-      RosterError.DEFENSE_TOO_FEW,
-      RosterError.DEFENSE_GOALKEEPER_REQUIRED,
-    ])
+  it('rejects more than six defensive field players', () => {
+    const players = [attacker('a'), ...many(defender, 7, 'd')]
+    expect(validateRoster(players)).toEqual([RosterError.DEFENSE_FIELD_TOO_MANY])
   })
 
   it('rejects a second goalkeeper', () => {
@@ -45,12 +47,25 @@ describe('validateRoster', () => {
       RosterError.DEFENSE_SINGLE_GOALKEEPER,
     ])
   })
+})
 
-  it('rejects more than six defensive field players', () => {
-    const players = [attacker('a'), ...many(defender, 7, 'd'), goalkeeper('gk')]
-    expect(validateRoster(players)).toEqual([
-      RosterError.DEFENSE_TOO_MANY,
-      RosterError.DEFENSE_FIELD_TOO_MANY,
+describe('setGoalkeeperEnabled', () => {
+  const players = [attacker('a'), defender('d')]
+
+  it('adds a goalkeeper standing in the goal when enabled', () => {
+    expect(setGoalkeeperEnabled(players, true, 'gk')).toEqual([
+      ...players,
+      { id: 'gk', side: 'defense', role: 'goalkeeper', trajectory: [{ t: 0, ...GOALKEEPER_START }] },
     ])
+  })
+
+  it('does not add a second goalkeeper when one is already enabled', () => {
+    const withGoalkeeper = setGoalkeeperEnabled(players, true, 'gk')
+    expect(setGoalkeeperEnabled(withGoalkeeper, true, 'gk2')).toEqual(withGoalkeeper)
+  })
+
+  it('removes the goalkeeper when disabled', () => {
+    const withGoalkeeper = setGoalkeeperEnabled(players, true, 'gk')
+    expect(setGoalkeeperEnabled(withGoalkeeper, false)).toEqual(players)
   })
 })
