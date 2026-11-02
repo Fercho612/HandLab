@@ -47,6 +47,28 @@ export function resolveBallRelease({ players, holderId, point, t }) {
   return receiverId ? { type: BallActionType.PASS, toPlayerId: receiverId } : null
 }
 
+/** Id of the player holding the ball at `t`, or `null` while it flies or after a shot. */
+export function ballHolderAt(ball, t) {
+  const action = lastActionStartedBy(ball.actions, t)
+  if (!action) return ball.initialHolderId
+  if (action.type === BallActionType.SHOT) return null
+
+  const flightEnd = action.trajectory[action.trajectory.length - 1].t
+  return t > flightEnd ? action.toPlayerId : null
+}
+
+/**
+ * Adds a recorded pass or shot. Like player layers, a new recording replaces
+ * everything the ball did from the moment it starts.
+ */
+export function recordBallAction(ball, action) {
+  const start = action.trajectory[0].t
+  return {
+    ...ball,
+    actions: [...ball.actions.filter((existing) => existing.trajectory[0].t < start), action],
+  }
+}
+
 function lastActionStartedBy(actions, t) {
   for (let i = actions.length - 1; i >= 0; i--) {
     if (actions[i].trajectory[0].t <= t) return actions[i]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BallActionType, ballPositionAt, resolveBallRelease } from './ball.js'
+import { BallActionType, ballHolderAt, ballPositionAt, recordBallAction, resolveBallRelease } from './ball.js'
 
 const players = [
   {
@@ -82,5 +82,38 @@ describe('resolveBallRelease', () => {
 
   it('is invalid when released back on the holder', () => {
     expect(resolveBallRelease({ players, holderId: 'a1', point: { x: 4, y: 10 }, t: 0 })).toBeNull()
+  })
+})
+
+describe('ballHolderAt', () => {
+  const ball = { initialHolderId: 'a1', actions: [pass, shot] }
+
+  it('is the initial holder before any action', () => {
+    expect(ballHolderAt(ball, 500)).toBe('a1')
+  })
+
+  it('is nobody while the ball is in flight', () => {
+    expect(ballHolderAt(ball, 1200)).toBeNull()
+  })
+
+  it('is the receiver after a pass', () => {
+    expect(ballHolderAt(ball, 2000)).toBe('a2')
+  })
+
+  it('is nobody after a shot', () => {
+    expect(ballHolderAt(ball, 9000)).toBeNull()
+  })
+})
+
+describe('recordBallAction', () => {
+  it('appends the action to the ball', () => {
+    const ball = { initialHolderId: 'a1', actions: [pass] }
+    expect(recordBallAction(ball, shot)).toEqual({ initialHolderId: 'a1', actions: [pass, shot] })
+  })
+
+  it('replaces every action that started at or after the new one', () => {
+    const ball = { initialHolderId: 'a1', actions: [pass, shot] }
+    const earlyShot = { type: BallActionType.SHOT, trajectory: [{ t: 500, x: 5, y: 10 }, { t: 900, x: 10, y: -0.5 }] }
+    expect(recordBallAction(ball, earlyShot)).toEqual({ initialHolderId: 'a1', actions: [earlyShot] })
   })
 })
