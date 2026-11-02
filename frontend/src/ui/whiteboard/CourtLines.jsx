@@ -22,7 +22,7 @@ export default function CourtLines() {
           <rect x="0" y="0" width={COURT.WIDTH} height={COURT.LENGTH} />
         </clipPath>
       </defs>
-      <rect className={styles.line} x="0" y="0" width={COURT.WIDTH} height={COURT.LENGTH} />
+      <rect className={styles.court} x="0" y="0" width={COURT.WIDTH} height={COURT.LENGTH} />
       <rect className={styles.goal} x={LEFT_POST} y={-GOAL.DEPTH} width={GOAL.WIDTH} height={GOAL.DEPTH} />
       <path className={styles.area} d={areaPath(6)} />
       <path className={`${styles.line} ${styles.dashed}`} d={areaPath(9)} clipPath="url(#court-clip)" />

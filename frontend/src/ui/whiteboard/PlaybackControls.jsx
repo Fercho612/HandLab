@@ -1,6 +1,6 @@
 import styles from './Whiteboard.module.css'
 
-const SPEEDS = [0.5, 1, 2]
+const SPEEDS = [0.5, 1, 1.5, 2]
 
 export default function PlaybackControls({
   isPlaying,

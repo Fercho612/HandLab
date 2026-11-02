@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { createPlaybackClock } from '../../application/playbackClock.js'
 import { createTrajectoryRecorder } from '../../application/trajectoryRecorder.js'
 import { ballHolderAt, ballPositionAt, recordBallAction, resolveBallRelease } from '../../domain/ball.js'
-import { COURT, GOAL, clampToCourt } from '../../domain/court.js'
+import { COURT, clampToCourt } from '../../domain/court.js'
 import { createDefaultPlay, playDuration, recordPlayerLayer, setPlayGoalkeeper } from '../../domain/play.js'
 import { Role, Side } from '../../domain/roster.js'
 import { positionAt } from '../../domain/trajectory.js'
@@ -13,9 +13,14 @@ import { toCourtPoint } from './toCourtPoint.js'
 import { usePlaybackLoop } from './usePlaybackLoop.js'
 import styles from './Whiteboard.module.css'
 
-const VIEW_BOX = `0 ${-GOAL.DEPTH - 0.5} ${COURT.WIDTH} ${COURT.LENGTH + GOAL.DEPTH + 0.5}`
-/** A held ball is drawn beside its holder so both stay visible. */
-const HELD_BALL_OFFSET = { x: 0.35, y: -0.35 }
+/** Space drawn behind the goal line, in meters: about 20px when the board is at its 640px maximum width. */
+const GOAL_SIDE_MARGIN = 0.625
+const VIEW_BOX = `0 ${-GOAL_SIDE_MARGIN} ${COURT.WIDTH} ${COURT.LENGTH + GOAL_SIDE_MARGIN}`
+/**
+ * A held ball is drawn in front of its holder, overlapping the marker a little.
+ * Attackers face the goal (towards y = 0); defenders and the goalkeeper face the half-court line.
+ */
+const HELD_BALL_OFFSET = { [Side.ATTACK]: { x: 0, y: -0.5 }, [Side.DEFENSE]: { x: 0, y: 0.5 } }
 const INVALID_RELEASE_MESSAGE = 'La pelota tiene que terminar en un jugador o en el arco.'
 
 /** Wall-clock time for the playback clock; only called from event handlers and the animation loop. */
@@ -83,8 +88,10 @@ export default function Whiteboard() {
       if (recording?.kind === Recording.BALL) return recording.point
       const holderId = ballHolderAt(ball, t)
       if (!holderId) return ballPositionAt(ball, players, t)
-      const holder = playerPosition(players.find((player) => player.id === holderId))
-      return { x: holder.x + HELD_BALL_OFFSET.x, y: holder.y + HELD_BALL_OFFSET.y }
+      const holder = players.find((player) => player.id === holderId)
+      const position = playerPosition(holder)
+      const offset = HELD_BALL_OFFSET[holder.side]
+      return { x: position.x + offset.x, y: position.y + offset.y }
     }
   })
 

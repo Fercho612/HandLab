@@ -23,3 +23,10 @@ describe('isInGoal', () => {
     expect(isInGoal({ x: 10, y: 0.5 })).toBe(false)
   })
 })
+
+describe('goal depth', () => {
+  it('ends 0.5 m behind the goal line', () => {
+    expect(isInGoal({ x: 10, y: -0.5 })).toBe(true)
+    expect(isInGoal({ x: 10, y: -0.6 })).toBe(false)
+  })
+})

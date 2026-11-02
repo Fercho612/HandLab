@@ -38,13 +38,30 @@ afterEach(() => {
 })
 
 describe('Whiteboard', () => {
-  it('places every player on the court and the ball with its holder', () => {
+  it('places every player on the court and the ball in front of its holder', () => {
     render(<Whiteboard />)
     advance(16)
 
     expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(1 1)')
     expect(token('Defensor 6')).toHaveAttribute('transform', 'translate(17 3.6)')
-    expect(token('Pelota')).toHaveAttribute('transform', 'translate(10.35 10.15)')
+    // Attackers face the goal, so the ball sits between them and the goal, overlapping the marker.
+    expect(token('Pelota')).toHaveAttribute('transform', 'translate(10 10)')
+  })
+
+  it('places the ball in front of a defender, facing away from the goal', () => {
+    render(<Whiteboard />)
+    advance(16)
+    drag(token('Pelota'), [{ x: 10, y: 10.5 }, { x: 8.5, y: 6.5 }], 400)
+    drag(token('Atacante 1'), [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }], 500)
+
+    seek(1000)
+    expect(token('Pelota')).toHaveAttribute('transform', 'translate(8.5 7)')
+  })
+
+  it('draws a square 20 x 20 m court with a small strip behind the goal line', () => {
+    render(<Whiteboard />)
+
+    expect(board()).toHaveAttribute('viewBox', '0 -0.625 20 20.625')
   })
 
   it('records a dragged player as a new layer of the play', () => {
@@ -124,6 +141,21 @@ describe('Whiteboard', () => {
 
     advance(600)
     expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(5 1)')
+    expect(screen.getByRole('button', { name: 'Reproducir' })).toBeInTheDocument()
+  })
+
+  it('plays faster at 1.5x', () => {
+    render(<Whiteboard />)
+    advance(16)
+    drag(token('Atacante 1'), [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 }], 500)
+    seek(0)
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Velocidad' }), { target: { value: '1.5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Reproducir' }))
+    advance(1100)
+
+    // 1.5 s of play take 1 s at 1.5x, so playback has ended; at 1x it would still be running (t = 1.1 s).
+    expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(4 1)')
     expect(screen.getByRole('button', { name: 'Reproducir' })).toBeInTheDocument()
   })
 })

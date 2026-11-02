@@ -3,17 +3,25 @@
   flex-direction: column;
   gap: 12px;
   max-width: 640px;
+  margin: 0 auto;
 }
 
 .board {
   display: block;
   width: 100%;
   height: auto;
-  background: var(--color-court);
+  /* Off-court surface; the 20 x 20 m court itself is the filled .court rectangle. */
+  background: var(--color-off-court);
   border-radius: 8px;
   /* Dragging must not scroll or zoom the page on touch screens. */
   touch-action: none;
   user-select: none;
+}
+
+.court {
+  fill: var(--color-court);
+  stroke: var(--color-line);
+  stroke-width: 0.08;
 }
 
 .line,
