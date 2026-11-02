@@ -68,7 +68,9 @@ HandLab/
 - Autenticación: email + contraseña. El backend emite un JWT de acceso (vida corta) y un refresh token, ambos en cookies httpOnly. Las contraseñas se guardan hasheadas (argon2 o bcrypt).
 - Las animaciones de las jugadas son trayectorias continuas: cada jugador tiene una secuencia de puntos `(t, x, y)` muestreados mientras el usuario lo arrastra. No hay keyframes ni interpolación entre posiciones clave.
 - Jugadores por lado: mínimo 1, máximo 7.
-- El lado defensivo puede tener como máximo 6 jugadores de campo y uno debe ser el arquero, ubicado en el arco.
+- El lado defensivo puede tener como máximo 6 jugadores de campo.
+- El arquero es opcional: se habilita con una opción y, al habilitarlo, aparece directamente en el arco.
+- Las jugadas se graban por capas: se graba un elemento por pasada mientras los ya grabados se reproducen sobre la misma línea de tiempo.
 - Los jugadores se modelan como SVG.
 - Los jugadores se mueven libremente dentro de la cancha.
 - Cada jugada tiene una pelota, modelada como SVG y animada con el mismo modelo de trayectoria continua que los jugadores.
