@@ -1,4 +1,6 @@
-import { Role, Side } from './roster.js'
+import { Role, Side, setGoalkeeperEnabled } from './roster.js'
+
+export const GOALKEEPER_ID = 'gk'
 
 /**
  * Applies a new recording layer on top of an existing trajectory: what happened before the
@@ -58,4 +60,17 @@ export function createDefaultPlay() {
     players: [...DEFAULT_ATTACK.map(place(Side.ATTACK, 'a')), ...DEFAULT_DEFENSE.map(place(Side.DEFENSE, 'd'))],
     ball: { initialHolderId: 'a3', actions: [] },
   }
+}
+
+/**
+ * Turns the optional goalkeeper on or off for a whole play. Disabling it also drops every ball action
+ * from the first pass to the goalkeeper on, since the ball cannot stay with a player who left the play.
+ */
+export function setPlayGoalkeeper(play, enabled) {
+  const players = setGoalkeeperEnabled(play.players, enabled, GOALKEEPER_ID)
+  if (enabled) return { ...play, players }
+
+  const firstPassToGoalkeeper = play.ball.actions.findIndex((action) => action.toPlayerId === GOALKEEPER_ID)
+  const actions = firstPassToGoalkeeper === -1 ? play.ball.actions : play.ball.actions.slice(0, firstPassToGoalkeeper)
+  return { ...play, players, ball: { ...play.ball, actions } }
 }

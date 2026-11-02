@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BallActionType } from './ball.js'
-import { createDefaultPlay, playDuration, recordPlayerLayer, replaceFrom } from './play.js'
+import { GOALKEEPER_START } from './court.js'
+import { createDefaultPlay, playDuration, recordPlayerLayer, replaceFrom, setPlayGoalkeeper } from './play.js'
 import { Side, validateRoster } from './roster.js'
 
 describe('replaceFrom', () => {
@@ -71,5 +72,38 @@ describe('createDefaultPlay', () => {
     expect(validateRoster(play.players)).toEqual([])
     expect(holder.side).toBe(Side.ATTACK)
     expect(play.ball.actions).toEqual([])
+  })
+})
+
+describe('setPlayGoalkeeper', () => {
+  const pass = (from, to, toPlayerId) => ({
+    type: BallActionType.PASS,
+    toPlayerId,
+    trajectory: [
+      { t: from, x: 0, y: 0 },
+      { t: to, x: 1, y: 1 },
+    ],
+  })
+
+  it('adds the goalkeeper in the goal when enabled', () => {
+    const play = setPlayGoalkeeper(createDefaultPlay(), true)
+    const goalkeeper = play.players.find((player) => player.role === 'goalkeeper')
+    expect(goalkeeper.trajectory).toEqual([{ t: 0, ...GOALKEEPER_START }])
+  })
+
+  it('removes the goalkeeper and every ball action from the first pass to them', () => {
+    const withGoalkeeper = setPlayGoalkeeper(createDefaultPlay(), true)
+    const play = {
+      ...withGoalkeeper,
+      ball: {
+        ...withGoalkeeper.ball,
+        actions: [pass(0, 500, 'a4'), pass(1000, 1500, 'gk'), pass(2000, 2500, 'a1')],
+      },
+    }
+
+    const updated = setPlayGoalkeeper(play, false)
+
+    expect(updated.players.some((player) => player.role === 'goalkeeper')).toBe(false)
+    expect(updated.ball.actions).toEqual([pass(0, 500, 'a4')])
   })
 })
