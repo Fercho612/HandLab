@@ -5,6 +5,8 @@ HandLab es una aplicación (PWA) que cuenta con una "pizarra" que es la mitad de
 ## Stack
 - Language/runtime: JavaScript, Python 3.12
 - Framework: React + Vite, FastAPI
+- Routing (frontend): React Router
+- Styles (frontend): CSS Modules (built into Vite, no extra dependency)
 - Data: PostgreSQL (Docker), Alembic (migrations)
 - Tests: Vitest, Pytest
 - Lint (backend): Ruff
@@ -68,6 +70,13 @@ HandLab/
 - Jugadores por lado: mínimo 1, máximo 7.
 - El lado defensivo puede tener como máximo 6 jugadores de campo y uno debe ser el arquero, ubicado en el arco.
 - Los jugadores se modelan como SVG.
+- Los jugadores se mueven libremente dentro de la cancha.
+- Cada jugada tiene una pelota, modelada como SVG y animada con el mismo modelo de trayectoria continua que los jugadores.
+- La pelota sigue al jugador que la tiene: mientras está en posesión, su posición se deriva de la de ese jugador.
+- La pelota solo se mueve por sí misma cuando el usuario la selecciona específicamente. Ese movimiento es un pase (termina en otro jugador, que pasa a tenerla) o un lanzamiento al arco.
+- Las lecciones (sección "Aprende") se componen de textos y jugadas. Cualquier usuario puede crear lecciones.
+- Jugadas y lecciones son públicas o privadas. Las públicas aparecen en un feed.
+- Cada usuario tiene un perfil con foto y descripción.
 
 ### Renderizado y animación
 - Puramente 2D. La optimización es un criterio de diseño.
