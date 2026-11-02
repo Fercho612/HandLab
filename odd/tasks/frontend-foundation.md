@@ -15,6 +15,8 @@ Branch: `feat/frontend-foundation` · Delivery: ask-on-risk · Test runner: Vite
 - Assumption A1: court coordinates are meters on a 20 m x 20 m half court, goal line at `y = 0`, goal centered at `x = 10` and 3 m wide.
 - S8: "[CAMBIOS DE DISEÑO] - El ancho y largo debe ser el mismo por mitad de cancha, la cancha mide 40x20, pero si estamos de un solo lado deberia medir 20x20. Diseña un poco por fuera del lado del arco, unos 20px. - Cuando se pega la pelota a un jugador debe hacerlo al frente de ellos, entrando un poco en el diagrama del jugador. - Centra la cancha en el ancho de la pantalla, ahora se ve corrida un poco hacia la izquierda. [FUNCIONALIDADES] - Agrega las opciones de Reinicar, Guardar, Eliminar y Velocidad en 1.5x."
 
+- S9: "cambiemos a keyframe las animaciones" + "1" (by steps). Supersedes S2, S3 and S7: a play is a list of steps; each step stores player positions and the ball state; playback interpolates linearly between steps, 1 s per transition; "Agregar paso" copies the current step; a pass or shot happens during the transition into the edited step and carries over to following steps with the same ball state.
+
 ## Tasks
 
 - [x] T1 (S1) scaffold frontend · route: inline · commit: a74d1e1 (build + lint green)
@@ -33,7 +35,8 @@ Branch: `feat/frontend-foundation` · Delivery: ask-on-risk · Test runner: Vite
 - [x] T15 (S8) square 20 x 20 m court with a 0.625 m strip behind the goal line (goal depth 0.5 m), ball in front of its holder, centered board, 1.5x speed · route: inline · commit: 739499f (RED 5 → GREEN; suite 79 passed)
 - [x] T16 (S8) Reiniciar erases every recording after a confirmation; Guardar and Eliminar are buttons only · route: inline · commit: see L13 (RED 4 → GREEN; suite 83 passed)
 - [ ] T17 Guardar and Eliminar behavior · waits for the backend
-- [ ] T14 (S6, S7) manual check in a real browser and on a phone (pointer mapping and capture are mocked in jsdom) · pending
+- [x] T18 (S9) step-based keyframes replace recorded trajectories (removed `trajectory.js`, `simplifyTrajectory.js`, `trajectoryRecorder.js`) · route: inline · commits: 9b76908 (CLAUDE.md), 1fc53df (RED → GREEN; suite 72 passed, lint and build green)
+- [ ] T14 (S6, S9) manual check in a real browser and on a phone (pointer mapping and capture are mocked in jsdom) · pending
 
 Route evidence: no Writer trigger (units are sequential and small), so every task runs inline.
 
@@ -52,3 +55,4 @@ Route evidence: no Writer trigger (units are sequential and small), so every tas
 - L11: review assessment over de27094..facb0c6: risk medium, review_due false (under_budget). Default play: 6 attackers vs 6-0 defense without goalkeeper, center back holding the ball. A tap without movement records nothing.
 - L12 (2026-11-02): "[CAMBIOS DE DISEÑO] - El ancho y largo debe ser el mismo por mitad de cancha, la cancha mide 40x20, pero si estamos de un solo lado deberia medir 20x20. Diseña un poco por fuera del lado del arco, unos 20px. - Cuando se pega la pelota a un jugador debe hacerlo al frente de ellos, entrando un poco en el diagrama del jugador. - Centra la cancha en el ancho de la pantalla, ahora se ve corrida un poco hacia la izquierda. [FUNCIONALIDADES] - Agrega las opciones de Reinicar, Guardar, Eliminar y Velocidad en 1.5x." Assumption: attackers face the goal and defenders face the half-court line, so the held ball is drawn 0.5 m towards the goal for attackers and away from it for defenders.
 - L13 (2026-11-02): "- Eso hace reiniciar. - Crea solo los botenes de guardar y eliminar". Restart keeps the goalkeeper setting because it is not a recording.
+- L14 (2026-11-02): "Me vas a matar, pero cambiemos a keyframe las animaciones. Te pido una re disculpa :(" then "1" (steps). T2, T3, T8 and T9 are superseded by T18. Drag keeps the grab offset; a ball in the goal cannot be dragged; disabling the goalkeeper gives the ball back to the previous holder.
