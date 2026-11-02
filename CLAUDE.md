@@ -8,7 +8,7 @@ HandLab es una aplicación (PWA) que cuenta con una "pizarra" que es la mitad de
 - Routing (frontend): React Router
 - Styles (frontend): CSS Modules (built into Vite, no extra dependency)
 - Data: PostgreSQL (Docker), Alembic (migrations)
-- Tests: Vitest, Pytest
+- Tests: Vitest (jsdom + Testing Library for UI components), Pytest
 - Lint (backend): Ruff
 - PWA: vite-plugin-pwa (manifest and installability only, no offline caching of plays)
 

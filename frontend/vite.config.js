@@ -27,6 +27,8 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Domain and application tests run in node; UI tests opt into jsdom with a @vitest-environment docblock.
     environment: 'node',
+    setupFiles: ['./src/test/setup.js'],
   },
 })
