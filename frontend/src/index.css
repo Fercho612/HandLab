@@ -1,14 +1,56 @@
+/*
+ * Design tokens, dark theme. Style: a tinted frame around a raised sheet; colour lives on the court and the
+ * players, the chrome stays neutral. Surfaces step up in lightness instead of casting shadows.
+ */
 :root {
-  --color-text: #1b1f24;
-  --color-bg: #f7f7f5;
-  --color-court: #2f7d4f;
-  --color-off-court: #24603d;
+  color-scheme: dark;
+
+  --ground: #0e1110;
+  --surface: #151917;
+  --raised: #1b201e;
+  --active: #252b28;
+  --border: #242a27;
+  --control: #39413d;
+  --text: #e6eae8;
+  --muted: #9aa39e;
+  --disabled: #5c6460;
+  --accent: #4fb37f;
+  --primary-bg: #e6eae8;
+  --primary-ink: #0e1110;
+  --negative: #f26b65;
+  --pill-neutral-bg: #252b28;
+  --pill-neutral-ink: #c4ccc8;
+  --pill-negative-bg: #3b1715;
+  --pill-negative-ink: #ffb8b1;
+
+  /* Court and players. */
+  --color-court: #2e7a52;
+  --color-off-court: #24613f;
   --color-line: #ffffff;
-  --font-sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --radius-sheet: 16px;
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --sheet-inset: 8px;
+  --top-bar-height: 48px;
+  --sidebar-width: 220px;
+  --control-height: 32px;
+  --gap: 24px;
+  --pad: 24px;
+
+  --fs-title: 22px;
+  --fs-section: 16px;
+  --fs-body: 14px;
+  --fs-small: 12px;
+
+  --font-sans: 'IBM Plex Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
 
   font-family: var(--font-sans);
-  color: var(--color-text);
-  background: var(--color-bg);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--ground);
+  -webkit-font-smoothing: antialiased;
 }
 
 *,
@@ -20,4 +62,35 @@
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--ground);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #2c5a43;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
 }
