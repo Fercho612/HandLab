@@ -1,0 +1,565 @@
+/* Layout: a title row, then the court on a tinted well and a 300px side panel (one column below 960px). */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-size: var(--fs-title);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  color: var(--muted);
+}
+
+.playActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--gap);
+  /* The panel shares the canvas's bottom edge; its step list takes the spare height. */
+  align-items: stretch;
+}
+
+.canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pad);
+  background: var(--raised);
+  border-radius: var(--radius-card);
+}
+
+/*
+ * The court keeps its aspect ratio (20 x 19.0625 m, about 1.049 wide per unit of height) and is sized so
+ * the whole editor fits the window height: 240px is the chrome above and below the board on desktop.
+ */
+.boardColumn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, max(320px, calc((100dvh - 240px) * 1.049)));
+}
+
+.board {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Off-court surface; the court itself is the filled .court rectangle. */
+  background: var(--color-off-court);
+  border-radius: var(--radius-card);
+  /* Dragging must not scroll or zoom the page on touch screens. */
+  touch-action: none;
+  user-select: none;
+}
+
+/* Court drawing, in meters. Its colors come from the court style, set as custom properties on the board. */
+.court {
+  fill: var(--color-court);
+  stroke: var(--color-line);
+  stroke-width: 0.08;
+}
+
+.line,
+.area {
+  fill: none;
+  stroke: var(--color-line);
+  stroke-width: 0.08;
+}
+
+.area {
+  fill: var(--color-area);
+}
+
+.dashed {
+  stroke-dasharray: 0.3 0.3;
+}
+
+.goal {
+  fill: rgb(255 255 255 / 0.3);
+  stroke: var(--color-line);
+  stroke-width: 0.1;
+}
+
+.token {
+  cursor: grab;
+}
+
+.token:active {
+  cursor: grabbing;
+}
+
+.token circle {
+  stroke-width: 0.06;
+}
+
+.token text {
+  font-family: var(--font-sans);
+  font-size: 0.5px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.ball circle {
+  fill: #ffffff;
+  stroke: #131416;
+  stroke-width: 0.05;
+}
+
+/* Transport under the court, as wide as the court. */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.playButton {
+  min-width: 116px;
+}
+
+.timeline {
+  flex: 1 1 160px;
+  min-width: 0;
+  height: var(--control-height);
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.time {
+  min-width: 3.5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.select {
+  height: var(--control-height);
+  padding: 0 8px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Floats over the court next to the tapped player, so it is the one surface with a shadow. */
+.positionMenu {
+  position: absolute;
+  z-index: 10;
+  width: 280px;
+  padding: 8px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-card);
+  background: var(--raised);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.5);
+  transform: translateX(-50%);
+}
+
+.positionMenu[data-placement='above'] {
+  transform: translate(-50%, -100%);
+}
+
+.positionMenuTitle {
+  padding: 4px 8px 8px;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.positionOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.positionOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.positionOption:hover {
+  background: var(--active);
+}
+
+.positionOption[aria-checked='true'] {
+  background: var(--active);
+}
+
+.positionOption[aria-checked='true'] .positionCode {
+  color: var(--accent);
+}
+
+.positionCode {
+  font-weight: 600;
+}
+
+.positionName {
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.message {
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--pill-negative-bg);
+  color: var(--pill-negative-ink);
+}
+
+/* Side panel. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.panelSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.stepsSection {
+  flex: 1;
+  min-height: 0;
+}
+
+.panelSection + .panelSection {
+  border-top: 1px solid var(--border);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panelTitle {
+  font-size: var(--fs-section);
+  font-weight: 600;
+}
+
+.panelMeta {
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  gap: 2px;
+  min-height: 40px;
+  margin: 0 -8px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.stepItem {
+  position: relative;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.step:hover {
+  background: var(--raised);
+}
+
+.step[aria-pressed='true'] {
+  background: var(--active);
+  font-weight: 600;
+}
+
+.stepMeta {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teamHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.teamName {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  outline: 1px solid rgb(255 255 255 / 0.25);
+  outline-offset: -1px;
+}
+
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--control);
+  border-radius: var(--radius-control);
+}
+
+.stepperButton {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.stepperButton svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.stepperButton:hover:not(:disabled) {
+  background: var(--active);
+}
+
+.stepperButton:disabled {
+  color: var(--disabled);
+  cursor: not-allowed;
+}
+
+.stepperValue {
+  min-width: 2ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.colorPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* A native radio drawn as a color dot; the chosen one gets a ring, the other team's color is dimmed. */
+.colorOption {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border-radius: 50%;
+  background: var(--option-color);
+  outline: 1px solid rgb(255 255 255 / 0.4);
+  outline-offset: -1px;
+  cursor: pointer;
+  appearance: none;
+  transition: transform 80ms ease;
+}
+
+.colorOption:hover:not(:disabled) {
+  transform: scale(1.1);
+}
+
+.colorOption:checked {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.colorOption:focus-visible {
+  outline-color: var(--accent);
+}
+
+.colorOption:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.courtStyles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.courtStyle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  border-radius: var(--radius-control);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.courtStyle:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.courtStyle:has(input:checked) {
+  background: var(--active);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.courtStyle:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.courtSwatch {
+  display: block;
+  width: 100%;
+  max-width: 48px;
+  aspect-ratio: 20 / 14;
+  border-radius: 4px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stepList {
+    flex: none;
+    max-height: 280px;
+  }
+
+  /* One column: the court takes the full width and the panel follows it. */
+  .boardColumn {
+    width: min(100%, 640px);
+  }
+}
+
+@media (max-width: 600px) {
+  .canvas {
+    padding: 0;
+    background: none;
+  }
+
+  .transport {
+    flex-wrap: wrap;
+  }
+
+  .timeline {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .speed {
+    margin-left: auto;
+  }
+}
