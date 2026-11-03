@@ -13,11 +13,14 @@ import {
   playDuration,
   playerPositionAt,
   resetPlay,
+  setFieldPlayerCount,
   setPlayGoalkeeper,
+  setTeamColor,
   STEP_DURATION,
   stepTime,
 } from './play.js'
 import { Side, validateRoster } from './roster.js'
+import { TeamColor } from './teamColors.js'
 
 const twoSteps = () => addStep(createDefaultPlay())
 const threeSteps = () => addStep(twoSteps())
@@ -31,6 +34,10 @@ describe('createDefaultPlay', () => {
     expect(validateRoster(play.players)).toEqual([])
     expect(holder.side).toBe(Side.ATTACK)
     expect(playDuration(play)).toBe(0)
+  })
+
+  it('dresses the attack in red and the defense in blue', () => {
+    expect(createDefaultPlay().teamColors).toEqual({ [Side.ATTACK]: TeamColor.RED, [Side.DEFENSE]: TeamColor.BLUE })
   })
 })
 
@@ -162,6 +169,88 @@ describe('setPlayGoalkeeper', () => {
   })
 })
 
+describe('setPlayGoalkeeper and team colors', () => {
+  it('keeps the team colors when the goalkeeper is toggled', () => {
+    const play = setTeamColor(createDefaultPlay(), Side.DEFENSE, TeamColor.BLACK)
+    expect(setPlayGoalkeeper(setPlayGoalkeeper(play, true), false).teamColors[Side.DEFENSE]).toBe(TeamColor.BLACK)
+  })
+})
+
+const fieldIds = (play, side) => play.players.filter((player) => player.side === side).map((player) => player.id)
+
+describe('setFieldPlayerCount', () => {
+  it('adds players at their starting spot in every step', () => {
+    const play = setFieldPlayerCount(twoSteps(), Side.ATTACK, 7)
+
+    expect(fieldIds(play, Side.ATTACK)).toEqual(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'])
+    expect(play.steps.map((step) => step.positions.a7)).toEqual([
+      { x: 10, y: 14.5 },
+      { x: 10, y: 14.5 },
+    ])
+    expect(validateRoster(play.players)).toEqual([])
+  })
+
+  it('removes the highest-numbered players of that side from every step', () => {
+    const play = setFieldPlayerCount(twoSteps(), Side.DEFENSE, 4)
+
+    expect(fieldIds(play, Side.DEFENSE)).toEqual(['d1', 'd2', 'd3', 'd4'])
+    expect(play.steps.every((step) => !('d5' in step.positions) && !('d6' in step.positions))).toBe(true)
+  })
+
+  it('puts players added back on their starting spot', () => {
+    const play = setFieldPlayerCount(setFieldPlayerCount(createDefaultPlay(), Side.ATTACK, 4), Side.ATTACK, 6)
+
+    expect(play.steps[0].positions.a5).toEqual({ x: 19, y: 1 })
+    expect(play.steps[0].positions.a6).toEqual({ x: 10, y: 6.6 })
+  })
+
+  it('gives the ball back to whoever had it before when its holder is removed', () => {
+    const play = addStep(moveBall(twoSteps(), 1, { holderId: 'a6' }))
+
+    const updated = setFieldPlayerCount(play, Side.ATTACK, 5)
+
+    expect(updated.steps.map((step) => step.ball)).toEqual([{ holderId: 'a3' }, { holderId: 'a3' }, { holderId: 'a3' }])
+  })
+
+  it('gives the ball to the first attacker when the starting holder is removed', () => {
+    const play = setFieldPlayerCount(twoSteps(), Side.ATTACK, 2)
+    expect(play.steps.map((step) => step.ball)).toEqual([{ holderId: 'a1' }, { holderId: 'a1' }])
+  })
+
+  it('keeps the steps and the team colors', () => {
+    const play = setTeamColor(twoSteps(), Side.ATTACK, TeamColor.BLACK)
+    const updated = setFieldPlayerCount(play, Side.DEFENSE, 5)
+
+    expect(updated.steps).toHaveLength(2)
+    expect(updated.teamColors).toEqual(play.teamColors)
+  })
+
+  it('allows 1 to 7 attackers and 1 to 6 defense field players', () => {
+    const play = createDefaultPlay()
+    expect(fieldIds(setFieldPlayerCount(play, Side.ATTACK, 1), Side.ATTACK)).toEqual(['a1'])
+    expect(fieldIds(setFieldPlayerCount(play, Side.DEFENSE, 1), Side.DEFENSE)).toEqual(['d1'])
+    expect(() => setFieldPlayerCount(play, Side.ATTACK, 0)).toThrow()
+    expect(() => setFieldPlayerCount(play, Side.ATTACK, 8)).toThrow()
+    expect(() => setFieldPlayerCount(play, Side.DEFENSE, 7)).toThrow()
+  })
+})
+
+describe('setTeamColor', () => {
+  it('changes the color of one team', () => {
+    const play = setTeamColor(createDefaultPlay(), Side.ATTACK, TeamColor.WHITE)
+    expect(play.teamColors).toEqual({ [Side.ATTACK]: TeamColor.WHITE, [Side.DEFENSE]: TeamColor.BLUE })
+  })
+
+  it('does not let both teams wear the same color', () => {
+    expect(() => setTeamColor(createDefaultPlay(), Side.ATTACK, TeamColor.BLUE)).toThrow()
+    expect(() => setTeamColor(createDefaultPlay(), Side.DEFENSE, TeamColor.RED)).toThrow()
+  })
+
+  it('only accepts colors from the palette', () => {
+    expect(() => setTeamColor(createDefaultPlay(), Side.ATTACK, 'green')).toThrow()
+  })
+})
+
 describe('resetPlay', () => {
   it('keeps only the first step', () => {
     const play = moveBall(movePlayer(threeSteps(), 2, 'a1', { x: 6, y: 4 }), 2, { holderId: 'a4' })
@@ -171,5 +260,13 @@ describe('resetPlay', () => {
   it('keeps the goalkeeper setting', () => {
     const play = setPlayGoalkeeper(twoSteps(), true)
     expect(resetPlay(play)).toEqual(setPlayGoalkeeper(createDefaultPlay(), true))
+  })
+
+  it('keeps the roster size and the team colors', () => {
+    const play = setTeamColor(setFieldPlayerCount(twoSteps(), Side.ATTACK, 7), Side.ATTACK, TeamColor.PINK)
+    const reset = resetPlay(play)
+
+    expect(reset.players).toEqual(play.players)
+    expect(reset.teamColors).toEqual(play.teamColors)
   })
 })
