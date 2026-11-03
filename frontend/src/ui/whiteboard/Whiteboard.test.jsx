@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Whiteboard from './Whiteboard.jsx'
 
@@ -13,6 +13,7 @@ const token = (name) => screen.getByLabelText(name)
 const board = () => screen.getByRole('img', { name: 'Pizarra' })
 const timeline = () => screen.getByRole('slider', { name: 'Línea de tiempo' })
 const button = (name) => screen.getByRole('button', { name })
+const colorGroup = (name) => screen.getByRole('radiogroup', { name })
 
 function drag(element, from, to) {
   fireEvent.pointerDown(element, { pointerId: 1, clientX: from.x, clientY: from.y })
@@ -20,6 +21,14 @@ function drag(element, from, to) {
   fireEvent.pointerUp(board(), { pointerId: 1, clientX: to.x, clientY: to.y })
   advance(16)
 }
+
+function tap(element, at) {
+  fireEvent.pointerDown(element, { pointerId: 1, clientX: at.x, clientY: at.y })
+  fireEvent.pointerUp(board(), { pointerId: 1, clientX: at.x, clientY: at.y })
+  advance(16)
+}
+
+const positionMenu = (name) => screen.getByRole('menu', { name: `Posición de ${name}` })
 
 function seek(ms) {
   fireEvent.input(timeline(), { target: { value: String(ms) } })
@@ -49,10 +58,18 @@ describe('Whiteboard', () => {
     expect(token('Pelota')).toHaveAttribute('transform', 'translate(10 10)')
   })
 
-  it('draws a square 20 x 20 m court with a small strip behind the goal line', () => {
+  it('draws the court with a small strip behind the goal line and its bottom 1.5625 m cropped', () => {
     renderBoard()
 
-    expect(board()).toHaveAttribute('viewBox', '0 -0.625 20 20.625')
+    expect(board()).toHaveAttribute('viewBox', '0 -0.625 20 19.0625')
+  })
+
+  it('keeps a dragged player inside the visible part of the court', () => {
+    renderBoard()
+
+    drag(token('Atacante 1'), { x: 1, y: 1 }, { x: 1, y: 25 })
+
+    expect(token('Atacante 1')).toHaveAttribute('transform', 'translate(1 18.438)')
   })
 
   it('starts with a single selected step numbered 0', () => {
@@ -242,6 +259,143 @@ describe('Whiteboard', () => {
     advance(16)
 
     expect(token('Arquero')).toHaveAttribute('transform', 'translate(10 0.5)')
+  })
+
+  it('adds an attacker on its starting spot and stops at 7', () => {
+    renderBoard()
+
+    fireEvent.click(button('Agregar atacante'))
+    advance(16)
+
+    expect(token('Atacante 7')).toHaveAttribute('transform', 'translate(10 14.5)')
+    expect(button('Agregar atacante')).toBeDisabled()
+  })
+
+  it('removes the last defender and lets the defense grow back to 6', () => {
+    renderBoard()
+    expect(button('Agregar defensor')).toBeDisabled()
+
+    fireEvent.click(button('Quitar defensor'))
+    advance(16)
+
+    expect(screen.queryByLabelText('Defensor 6')).not.toBeInTheDocument()
+    expect(button('Agregar defensor')).toBeEnabled()
+  })
+
+  it('keeps at least one player on each side', () => {
+    renderBoard()
+
+    for (let i = 0; i < 5; i++) fireEvent.click(button('Quitar atacante'))
+
+    expect(screen.queryByLabelText('Atacante 2')).not.toBeInTheDocument()
+    expect(button('Quitar atacante')).toBeDisabled()
+  })
+
+  it('dresses a team in the chosen color', () => {
+    renderBoard()
+
+    fireEvent.click(within(colorGroup('Color de los atacantes')).getByRole('radio', { name: 'Negro' }))
+
+    expect(token('Atacante 1').querySelector('circle')).toHaveAttribute('fill', '#17191c')
+    expect(token('Defensor 1').querySelector('circle')).toHaveAttribute('fill', '#2a5caa')
+  })
+
+  it('does not offer a team the color the other team is wearing', () => {
+    renderBoard()
+    const attackColor = (name) => within(colorGroup('Color de los atacantes')).getByRole('radio', { name })
+
+    expect(attackColor('Azul')).toBeDisabled()
+
+    fireEvent.click(within(colorGroup('Color de los defensores')).getByRole('radio', { name: 'Blanco' }))
+
+    expect(attackColor('Azul')).toBeEnabled()
+    expect(attackColor('Blanco')).toBeDisabled()
+  })
+
+  it('draws the court in the chosen style', () => {
+    renderBoard()
+    const courtStyle = (name) => within(colorGroup('Estilo de cancha')).getByRole('radio', { name })
+    expect(courtStyle('Verde')).toBeChecked()
+    expect(board().style.getPropertyValue('--color-court')).toBe('#2e7a52')
+
+    fireEvent.click(courtStyle('Madera'))
+
+    expect(courtStyle('Madera')).toBeChecked()
+    expect(board().style.getPropertyValue('--color-court')).toBe('#c9965f')
+    expect(board().style.getPropertyValue('--color-line')).toBe('#1d2b4f')
+  })
+
+  it('shows each player position on its token', () => {
+    renderBoard()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Habilitar arquero' }))
+
+    expect(token('Atacante 1')).toHaveTextContent('EI')
+    expect(token('Atacante 2')).toHaveTextContent('LI')
+    expect(token('Atacante 4')).toHaveTextContent('LD')
+    expect(token('Atacante 6')).toHaveTextContent('P')
+    expect(token('Defensor 1')).toHaveTextContent('1I')
+    expect(token('Defensor 4')).toHaveTextContent('3D')
+    expect(token('Arquero')).toHaveTextContent('AR')
+  })
+
+  it('changes a player position from a tap on it', () => {
+    renderBoard()
+
+    tap(token('Atacante 1'), { x: 1, y: 1 })
+    const menu = positionMenu('Atacante 1')
+    expect(within(menu).getByRole('menuitemradio', { name: 'EI Extremo izquierdo' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'P Pivote' }))
+
+    expect(token('Atacante 1')).toHaveTextContent('P')
+    expect(token('Atacante 6')).toHaveTextContent('P')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('offers defenders the defense positions only', () => {
+    renderBoard()
+
+    tap(token('Defensor 2'), { x: 5.6, y: 5.8 })
+
+    const names = within(positionMenu('Defensor 2'))
+      .getAllByRole('menuitemradio')
+      .map((item) => item.textContent)
+    expect(names).toEqual([
+      '1I Primero izquierdo',
+      '2I Segundo izquierdo',
+      '3I Tercero izquierdo',
+      '3D Tercero derecho',
+      '2D Segundo derecho',
+      '1D Primero derecho',
+    ])
+  })
+
+  it('closes the position menu with Escape without changing the position', () => {
+    renderBoard()
+    tap(token('Atacante 1'), { x: 1, y: 1 })
+
+    fireEvent.keyDown(positionMenu('Atacante 1'), { key: 'Escape' })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(token('Atacante 1')).toHaveTextContent('EI')
+  })
+
+  it('does not open the position menu after a drag', () => {
+    renderBoard()
+
+    drag(token('Atacante 1'), { x: 1, y: 1 }, { x: 5, y: 1 })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('keeps the goalkeeper position fixed', () => {
+    renderBoard()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Habilitar arquero' }))
+    advance(16)
+
+    tap(token('Arquero'), { x: 10, y: 0.5 })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('plays the steps and pauses at the end', () => {

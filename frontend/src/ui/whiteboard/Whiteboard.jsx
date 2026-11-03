@@ -1,7 +1,6 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { createPlaybackClock } from '../../application/playbackClock.js'
 import { BallActionType, heldBallPosition, resolveBallRelease } from '../../domain/ball.js'
-import { COURT, clampToCourt } from '../../domain/court.js'
 import {
   addStep,
   ballPositionAt,
@@ -14,22 +13,31 @@ import {
   playDuration,
   playerPositionAt,
   resetPlay,
+  setCourtStyle,
+  setFieldPlayerCount,
   setPlayGoalkeeper,
+  setPlayerPosition,
+  setTeamColor,
   stepTime,
 } from '../../domain/play.js'
-import { Role, Side } from '../../domain/roster.js'
+import { Role } from '../../domain/roster.js'
+import { VIEW_BOX, clampToVisibleCourt } from './boardView.js'
 import CourtLines from './CourtLines.jsx'
+import CourtPanel from './CourtPanel.jsx'
+import { courtStyleVars } from './courtStyleStyles.js'
 import PlayActions from './PlayActions.jsx'
 import PlaybackControls from './PlaybackControls.jsx'
+import PositionMenu from './PositionMenu.jsx'
+import RosterPanel from './RosterPanel.jsx'
 import StepBar from './StepBar.jsx'
+import { playerLabels } from './playerLabels.js'
+import { playerColors } from './teamColorStyles.js'
 import { BallToken, PlayerToken } from './Tokens.jsx'
 import { toCourtPoint } from './toCourtPoint.js'
 import { usePlaybackLoop } from './usePlaybackLoop.js'
+import controls from '../shared/controls.module.css'
 import styles from './Whiteboard.module.css'
 
-/** Space drawn behind the goal line, in meters: about 20px when the board is at its 640px maximum width. */
-const GOAL_SIDE_MARGIN = 0.625
-const VIEW_BOX = `0 ${-GOAL_SIDE_MARGIN} ${COURT.WIDTH} ${COURT.LENGTH + GOAL_SIDE_MARGIN}`
 /** A drag shorter than this, in meters, is a tap and changes nothing. */
 const MIN_DRAG_DISTANCE = 0.05
 const INVALID_RELEASE_MESSAGE = 'La pelota tiene que terminar en un jugador o en el arco.'
@@ -50,6 +58,10 @@ function confirmFollowingSteps(action, play, step) {
   return count === 0 || window.confirm(followingStepsWarning(action, step, count))
 }
 
+/** Size of the position menu, in pixels, to keep it inside the board. */
+const POSITION_MENU_WIDTH = 280
+const POSITION_MENU_HEIGHT = 200
+
 /** Wall-clock time for the playback clock; only called from event handlers and the animation loop. */
 const wallClock = () => performance.now()
 
@@ -58,23 +70,13 @@ const Dragging = Object.freeze({ PLAYER: 'player', BALL: 'ball' })
 const round = (value) => Math.round(value * 1000) / 1000
 const moveTo = (element, { x, y }) => element.setAttribute('transform', `translate(${round(x)} ${round(y)})`)
 
-function playerLabels(players) {
-  const counters = { [Side.ATTACK]: 0, [Side.DEFENSE]: 0 }
-  return new Map(
-    players.map((player) => {
-      if (player.role === Role.GOALKEEPER) return [player.id, { label: 'Arquero', number: 'AR' }]
-      const number = ++counters[player.side]
-      const name = player.side === Side.ATTACK ? 'Atacante' : 'Defensor'
-      return [player.id, { label: `${name} ${number}`, number }]
-    }),
-  )
-}
-
 export default function Whiteboard() {
   const [play, setPlay] = useState(createDefaultPlay)
   const [selectedStep, setSelectedStep] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [message, setMessage] = useState(null)
+  const [positionMenu, setPositionMenu] = useState(null)
+  const closePositionMenu = useCallback(() => setPositionMenu(null), [])
 
   const [clock] = useState(() => createPlaybackClock({ duration: 0 }))
   const playRef = useRef(play)
@@ -84,6 +86,7 @@ export default function Whiteboard() {
   const ballRef = useRef(null)
   const timelineRef = useRef(null)
   const timeLabelRef = useRef(null)
+  const boardColumnRef = useRef(null)
 
   useLayoutEffect(() => {
     playRef.current = play
@@ -173,7 +176,7 @@ export default function Whiteboard() {
     if (!drag) return
     const pointer = toCourtPoint(svgRef.current, event)
     const point = { x: pointer.x + drag.offset.x, y: pointer.y + drag.offset.y }
-    drag.point = drag.kind === Dragging.PLAYER ? clampToCourt(point) : point
+    drag.point = drag.kind === Dragging.PLAYER ? clampToVisibleCourt(point) : point
   }
 
   function handlePointerUp(event) {
@@ -183,7 +186,11 @@ export default function Whiteboard() {
     dragRef.current = null
 
     const moved = Math.hypot(drag.point.x - drag.start.x, drag.point.y - drag.start.y)
-    if (moved < MIN_DRAG_DISTANCE) return
+    if (moved < MIN_DRAG_DISTANCE) {
+      // A tap on a field player opens its position menu; the goalkeeper's position never changes.
+      if (drag.kind === Dragging.PLAYER) openPositionMenu(drag.id)
+      return
+    }
 
     if (drag.kind === Dragging.PLAYER) {
       if (!confirmFollowingSteps('modify', play, drag.step)) return
@@ -200,6 +207,32 @@ export default function Whiteboard() {
     if (!confirmFollowingSteps('modify', play, drag.step)) return
     const nextBall = release.type === BallActionType.SHOT ? { goal: drag.point } : { holderId: release.toPlayerId }
     commit(moveBall(play, drag.step, nextBall), drag.step)
+  }
+
+  function openPositionMenu(playerId) {
+    const player = play.players.find((candidate) => candidate.id === playerId)
+    if (player.role !== Role.FIELD) return
+    setPositionMenu({ playerId, anchor: positionMenuAnchor(playerId) })
+  }
+
+  /** Places the menu under the tapped player, or above it near the bottom, always inside the board. */
+  function positionMenuAnchor(playerId) {
+    const column = boardColumnRef.current.getBoundingClientRect()
+    const token = playerRefs.current.get(playerId).getBoundingClientRect()
+    const center = token.left + token.width / 2 - column.left
+    const below = token.bottom - column.top + 8
+    const fitsBelow = below + POSITION_MENU_HEIGHT <= column.height
+    const half = POSITION_MENU_WIDTH / 2
+    return {
+      left: Math.min(Math.max(center, half), column.width - half),
+      top: fitsBelow ? below : token.top - column.top - 8,
+      placement: fitsBelow ? 'below' : 'above',
+    }
+  }
+
+  function choosePosition(position) {
+    commit(setPlayerPosition(play, positionMenu.playerId, position), selectedStep)
+    setPositionMenu(null)
   }
 
   function togglePlay() {
@@ -235,58 +268,95 @@ export default function Whiteboard() {
   }
 
   return (
-    <div className={styles.wrapper}>
-      <svg
-        ref={svgRef}
-        className={styles.board}
-        viewBox={VIEW_BOX}
-        role="img"
-        aria-label="Pizarra"
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
-        <CourtLines />
-        {play.players.map((player) => (
-          <PlayerToken
-            key={player.id}
-            player={player}
-            label={labels.get(player.id).label}
-            number={labels.get(player.id).number}
-            elementRef={bindPlayerRef(player.id)}
-            onPointerDown={(event) => startDrag(Dragging.PLAYER, player.id, event)}
+    <div className={styles.editor}>
+      <div className={styles.titleRow}>
+        <div className={styles.titleBlock}>
+          <div className={styles.titleLine}>
+            <h1 className={styles.title}>Nueva jugada</h1>
+            <span className={controls.pill}>Sin guardar</span>
+          </div>
+          <p className={styles.subtitle}>Agrega pasos y mueve a los jugadores o la pelota en cada uno.</p>
+        </div>
+        <PlayActions onRestart={restart} />
+      </div>
+
+      <div className={styles.workspace}>
+        <section className={styles.canvas} aria-label="Cancha">
+          <div ref={boardColumnRef} className={styles.boardColumn}>
+            <svg
+              ref={svgRef}
+              className={styles.board}
+              style={courtStyleVars(play.courtStyle)}
+              viewBox={VIEW_BOX}
+              role="img"
+              aria-label="Pizarra"
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            >
+              <CourtLines />
+              {play.players.map((player) => (
+                <PlayerToken
+                  key={player.id}
+                  label={labels.get(player.id).label}
+                  position={labels.get(player.id).position}
+                  colors={playerColors(player, play.teamColors)}
+                  elementRef={bindPlayerRef(player.id)}
+                  onPointerDown={(event) => startDrag(Dragging.PLAYER, player.id, event)}
+                />
+              ))}
+              <BallToken elementRef={ballRef} onPointerDown={(event) => startDrag(Dragging.BALL, null, event)} />
+            </svg>
+
+            {positionMenu && (
+              <PositionMenu
+                player={play.players.find((player) => player.id === positionMenu.playerId)}
+                label={labels.get(positionMenu.playerId).label}
+                anchor={positionMenu.anchor}
+                onSelect={choosePosition}
+                onClose={closePositionMenu}
+              />
+            )}
+
+            {message && (
+              <p role="alert" className={styles.message}>
+                {message}
+              </p>
+            )}
+
+            <PlaybackControls
+              isPlaying={isPlaying}
+              duration={playDuration(play)}
+              timelineRef={timelineRef}
+              timeLabelRef={timeLabelRef}
+              onTogglePlay={togglePlay}
+              onSeek={(t) => clock.seek(t, wallClock())}
+              onRateChange={(rate) => clock.setRate(rate, wallClock())}
+            />
+          </div>
+        </section>
+
+        <aside className={styles.panel}>
+          <StepBar
+            count={play.steps.length}
+            selected={selectedStep}
+            onSelect={(index) => goToStep(index)}
+            onAdd={addStepAtEnd}
+            onDelete={deleteSelectedStep}
           />
-        ))}
-        <BallToken elementRef={ballRef} onPointerDown={(event) => startDrag(Dragging.BALL, null, event)} />
-      </svg>
-
-      {message && (
-        <p role="alert" className={styles.message}>
-          {message}
-        </p>
-      )}
-
-      <StepBar
-        count={play.steps.length}
-        selected={selectedStep}
-        onSelect={(index) => goToStep(index)}
-        onAdd={addStepAtEnd}
-        onDelete={deleteSelectedStep}
-      />
-
-      <PlaybackControls
-        isPlaying={isPlaying}
-        duration={playDuration(play)}
-        timelineRef={timelineRef}
-        timeLabelRef={timeLabelRef}
-        goalkeeperEnabled={play.players.some((player) => player.role === Role.GOALKEEPER)}
-        onTogglePlay={togglePlay}
-        onSeek={(t) => clock.seek(t, wallClock())}
-        onRateChange={(rate) => clock.setRate(rate, wallClock())}
-        onGoalkeeperChange={(enabled) => commit(setPlayGoalkeeper(play, enabled), selectedStep)}
-      />
-
-      <PlayActions onRestart={restart} />
+          <RosterPanel
+            players={play.players}
+            teamColors={play.teamColors}
+            onFieldCountChange={(side, count) => commit(setFieldPlayerCount(play, side, count), selectedStep)}
+            onTeamColorChange={(side, color) => commit(setTeamColor(play, side, color), selectedStep)}
+            onGoalkeeperChange={(enabled) => commit(setPlayGoalkeeper(play, enabled), selectedStep)}
+          />
+          <CourtPanel
+            courtStyle={play.courtStyle}
+            onCourtStyleChange={(courtStyle) => commit(setCourtStyle(play, courtStyle), selectedStep)}
+          />
+        </aside>
+      </div>
     </div>
   )
 }
